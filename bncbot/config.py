@@ -38,7 +38,7 @@ class BotConfig(FileBasedDataModel):
     command_prefix: str = "."
     bind_host_net: str = "127.0.0.0/16"
     lastseen_registry_path: str = ""
-    pastebin_url: str = ""
+    pastebin_url: str = "https://x0.at"
     pastebin_field: str = "file"
 
     debug: bool = False

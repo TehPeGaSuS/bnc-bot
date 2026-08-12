@@ -20,7 +20,8 @@ This bot may work with other systems, but this is the setup it was specifically 
   `/home/bnc/.znc/moddata/lastseen/.registry`), read directly from disk rather than queried over IRC to avoid
   flooding on BNC setups with many users. Enables the `lastseen <user>` command; leave empty to disable it.
 - `pastebin_url` / `pastebin_field`: upload endpoint and form field name for the `listusers` command. Must accept
-  a `multipart/form-data` POST and respond with the plaintext paste URL. `pastebin_field` defaults to `file`,
+  a `multipart/form-data` POST and respond with the plaintext paste URL. Defaults to `https://x0.at`.
+  `pastebin_field` defaults to `file`,
   matching 0x0.st/x0.at and most compatible self-hosted clones (e.g.
   [single_php_filehost](https://github.com/Rouji/single_php_filehost), a lightweight self-hosted x0.at-compatible
   option). For [pinnwand](https://supakeen.com/project/pinnwand/)'s `/curl` endpoint, set `pastebin_field` to

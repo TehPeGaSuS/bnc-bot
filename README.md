@@ -30,8 +30,8 @@ This bot may work with other systems, but this is the setup it was specifically 
   the registration date returned by NickServ's `INFO`. `0` (default) disables the check.
 - `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
   there but never joins it automatically otherwise).
-- `user_channels`: channels suggested to users in the credentials memo sent when their BNC account is created.
-  Purely informational; the bot does not invite or join users to these itself.
+- `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via
+  `controlpanel`'s `AddChan`), so ZNC joins them for the user on connect. Also listed in the credentials memo.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range

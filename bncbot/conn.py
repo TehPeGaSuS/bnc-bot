@@ -268,7 +268,7 @@ class Conn:
         if not self.config.user_channels:
             return ""
 
-        return f" Suggested channels: {', '.join(self.config.user_channels)}"
+        return f" Joined channels: {', '.join(self.config.user_channels)}"
 
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
@@ -366,6 +366,12 @@ class Conn:
         self.module_msg("controlpanel", f"Set AltNick {username} {nick}_")
         self.module_msg("controlpanel", f"Set Ident {username} {nick}")
         self.module_msg("controlpanel", f"Set Realname {username} {nick}")
+        for chan in self.config.user_channels:
+            self.module_msg(
+                "controlpanel",
+                f"AddChan {username} {self.config.bnc_network} {chan}",
+            )
+
         self.send("znc saveconfig")
         self.module_msg(
             "controlpanel", f"reconnect {username} {self.config.bnc_network}"

@@ -154,4 +154,5 @@ def upload_pastebin(
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read().decode().strip()
+        result: str = resp.read().decode().strip()
+        return result

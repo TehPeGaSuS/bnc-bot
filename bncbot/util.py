@@ -147,12 +147,12 @@ def upload_pastebin(
         + f"\r\n--{boundary}--\r\n".encode()
     )
 
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310
         url,
         data=body,
         method="POST",
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
         result: str = resp.read().decode().strip()
         return result

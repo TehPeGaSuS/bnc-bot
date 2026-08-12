@@ -2,19 +2,17 @@
     "user": "BNCServ",
     "pass": "",
     "status_prefix": "*",
-    "server": "bnc.snoonet.org",
+    "server": "bnc.example.org",
     "port": 5457,
     "ssl": true,
-    "bnc_network": "Snoonet",
+    "bnc_network": "MyNetwork",
     "client_ssl_port": 5457,
     "client_non_ssl_port": 5456,
     "admins": [
-        "*!*@snoonet/staff/*",
-        "*!*@snoonet/manager/*",
-        "*!*@snoonet/owner/*",
-        "*!*@snoonet/founder/*"
+        "*!*@staff.example.org/*"
     ],
     "log_channel": "##sysop",
     "command_prefix": ".",
-    "bind_host_net": "127.0.0.0/16"
+    "bind_host_net": "127.0.0.0/16",
+    "lastseen_registry_path": ""
 }

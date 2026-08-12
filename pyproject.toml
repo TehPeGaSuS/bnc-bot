@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "bnc-bot"
 dynamic = ["version"]
-description = "A bot to handle BNC account requests for Snoonet"
+description = "A bot to handle BNC account requests for IRC networks"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

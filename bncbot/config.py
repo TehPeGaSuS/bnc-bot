@@ -37,6 +37,7 @@ class BotConfig(FileBasedDataModel):
     log_channel: str = "##log_channel"
     command_prefix: str = "."
     bind_host_net: str = "127.0.0.0/16"
+    lastseen_registry_path: str = ""
 
     debug: bool = False
     log_to_file: bool = False

@@ -11,7 +11,7 @@ import logging.config
 import signal
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -45,6 +45,8 @@ class Conn:
         self.stopped_future = asyncio.Future[None]()
         self.get_users_state: int = 0
         self.config = BotConfig.load_config(self.config_file)
+        self._lastseen_cache: dict[str, str] = {}
+        self._lastseen_mtime: float | None = None
         if not self.log_dir.exists():
             self.log_dir.mkdir()
 
@@ -264,6 +266,38 @@ class Conn:
 
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
+
+    def _refresh_lastseen(self) -> None:
+        path = Path(self.config.lastseen_registry_path)
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            self._lastseen_cache = {}
+            self._lastseen_mtime = None
+            return
+
+        if mtime != self._lastseen_mtime:
+            self._lastseen_cache = util.parse_znc_registry(path)
+            self._lastseen_mtime = mtime
+
+    def get_lastseen(self, username: str) -> str | None:
+        """Look up a user's last-seen time from the ZNC lastseen module's
+        registry file. Returns None if the user has no recorded entry.
+        Raises ValueError if lastseen_registry_path isn't configured."""
+        if not self.config.lastseen_registry_path:
+            raise ValueError
+
+        self._refresh_lastseen()
+        raw = self._lastseen_cache.get(username)
+        if raw is None:
+            return None
+
+        try:
+            timestamp = int(raw)
+        except ValueError:
+            return None
+
+        return datetime.fromtimestamp(timestamp).strftime("%c")
 
     async def is_bnc_admin(self, name: str) -> bool:
         lock = self.locks["controlpanel_bncadmin"]

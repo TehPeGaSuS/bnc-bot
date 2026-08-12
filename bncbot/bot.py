@@ -268,6 +268,22 @@ async def cmd_bncqueue(bnc_queue: BNCQueue, event: "CommandEvent") -> None:
         event.message("BNC request queue is empty")
 
 
+@command("lastseen", admin=True)
+async def cmd_lastseen(text: str, conn: "Conn", event: "CommandEvent") -> None:
+    """<user> - Show when [user] was last seen connected to the BNC"""
+    acct = text.split()[0]
+    try:
+        seen = conn.get_lastseen(acct)
+    except ValueError:
+        event.message("lastseen_registry_path is not configured")
+        return
+
+    if seen is None:
+        event.message(f"No lastseen record for {acct}")
+    else:
+        event.message(f"{acct} was last seen: {seen}")
+
+
 @command("delbnc", admin=True)
 async def cmd_delbnc(
     text: str,

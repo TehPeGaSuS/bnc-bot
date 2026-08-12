@@ -1,5 +1,5 @@
 # bnc-bot
-A bot to handle BNC account requests for Snoonet
+A bot to handle BNC account requests for IRC networks
 
 ## Designed for
 - [Anope](https://anope.org) IRC Services v2.0.15
@@ -11,11 +11,14 @@ This bot may work with other systems, but this is the setup it was specifically 
 ## Requirements
 - Python 3.10+
 ## Configuration Notes
-- `bnc_network`: name of the ZNC network the bot reconnects new users to after account creation (default `Snoonet`).
-  This must match a network already attached to the ZNC template used for new accounts.
+- `bnc_network`: name of the ZNC network the bot reconnects new users to after account creation. This must match a
+  network already attached to the ZNC template used for new accounts.
 - `client_ssl_port` / `client_non_ssl_port`: SSL and non-SSL ports advertised to users in the BNC connection info
   memo sent on account creation/password reset. These are independent of `port`, which is only used for the bot's
   own admin connection to ZNC.
+- `lastseen_registry_path`: path to ZNC's `lastseen` module registry file (e.g.
+  `/home/bnc/.znc/moddata/lastseen/.registry`), read directly from disk rather than queried over IRC to avoid
+  flooding on BNC setups with many users. Enables the `lastseen <user>` command; leave empty to disable it.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range
@@ -64,3 +67,9 @@ Grant [username] BNC admin access
 
 #### `bncrefresh`
 Update the cached version of the BNC user list
+
+#### `lastseen <username>`
+Show when [username] was last seen connected to the BNC (requires `lastseen_registry_path` to be configured)
+
+## Credits
+This project is forked from [TotallyNotRobots/bnc-bot](https://github.com/TotallyNotRobots/bnc-bot).

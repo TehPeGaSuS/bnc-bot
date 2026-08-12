@@ -151,7 +151,12 @@ def upload_pastebin(
         url,
         data=body,
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            # Some pastebin hosts (e.g. Cloudflare-fronted) block the
+            # default "Python-urllib/x.y" UA outright.
+            "User-Agent": "bnc-bot",
+        },
     )
     with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
         result: str = resp.read().decode().strip()

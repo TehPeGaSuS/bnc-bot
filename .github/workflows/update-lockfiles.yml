@@ -10,10 +10,6 @@ env:
 
 jobs:
   update-pre-commit-config:
-    permissions:
-      contents: write
-      pull-requests: write
-
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -26,9 +22,7 @@ jobs:
           cache: 'pip'
 
       - name: Install Hatch
-        uses: pypa/hatch@257e27e51a6a5616ed08a39a408a21c35c9931bc # install
-        with:
-          version: "${{ env.HATCH_VERSION }}"
+        run: python -m pip install "hatch==${{ env.HATCH_VERSION }}"
 
       - name: Update lockfiles
         run: hatch run hatch-pip-compile --upgrade --all
@@ -42,6 +36,6 @@ jobs:
           branch: "update/lockfiles"
           base: ${{ github.ref_name }}
           labels: "update"
-          reviewers: "linuxdaemon"
-          assignees: "linuxdaemon"
+          reviewers: "pegasus"
+          assignees: "pegasus"
           sign-commits: true

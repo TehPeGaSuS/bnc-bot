@@ -7,9 +7,6 @@ on:
 
 jobs:
   nitpick:
-    permissions:
-      contents: write
-      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -31,6 +28,6 @@ jobs:
           branch: "nitpick"
           base: ${{ github.ref_name }}
           labels: "nitpick"
-          reviewers: "linuxdaemon"
-          assignees: "linuxdaemon"
+          reviewers: "pegasus"
+          assignees: "pegasus"
           sign-commits: true

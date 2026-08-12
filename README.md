@@ -10,6 +10,12 @@ This bot may work with other systems, but this is the setup it was specifically 
 
 ## Requirements
 - Python 3.10+
+## Configuration Notes
+- `bnc_network`: name of the ZNC network the bot reconnects new users to after account creation (default `Snoonet`).
+  This must match a network already attached to the ZNC template used for new accounts.
+- `client_ssl_port` / `client_non_ssl_port`: SSL and non-SSL ports advertised to users in the BNC connection info
+  memo sent on account creation/password reset. These are independent of `port`, which is only used for the bot's
+  own admin connection to ZNC.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range

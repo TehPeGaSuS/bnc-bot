@@ -294,10 +294,10 @@ async def cmd_listusers(
         return
 
     lines = [
-        f"{nick} {host or '(no bindhost)'}"
+        f"{nick} - {host or '(no bindhost)'}"
         for nick, host in sorted(bnc_users.items())
     ]
-    content = "\n".join(lines)
+    content = "ZNC Users\n---------\n\n" + "\n".join(lines)
 
     try:
         url = await conn.upload_pastebin(content, "bnc-users.txt")

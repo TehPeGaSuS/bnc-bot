@@ -297,7 +297,8 @@ class Conn:
         except ValueError:
             return None
 
-        return datetime.fromtimestamp(timestamp).strftime("%c")
+        # naive/local to match ZNC's own strftime("%c", localtime(...)) display
+        return datetime.fromtimestamp(timestamp).strftime("%c")  # noqa: DTZ006
 
     async def is_bnc_admin(self, name: str) -> bool:
         lock = self.locks["controlpanel_bncadmin"]

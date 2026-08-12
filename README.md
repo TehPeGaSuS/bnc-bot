@@ -31,7 +31,7 @@ This bot may work with other systems, but this is the setup it was specifically 
 - `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
   there but never joins it automatically otherwise).
 - `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via
-  `controlpanel`'s `AddChan`), so ZNC joins them for the user on connect. Also listed in the credentials memo.
+  `controlpanel`'s `AddChan`), so ZNC joins them for the user on connect.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range

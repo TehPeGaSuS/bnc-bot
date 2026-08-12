@@ -356,7 +356,7 @@ async def cmd_resetpass(
     event.message(
         f"SEND {nick} [New Password!] Your BNC auth is Username: {nick} "
         f"Password: {passwd} {conn.client_connect_info()} and /PASS "
-        f"{nick}:{passwd}",
+        f"{nick}/{conn.config.bnc_network}:{passwd}",
         "MemoServ",
     )
 

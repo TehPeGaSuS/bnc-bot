@@ -264,12 +264,6 @@ class Conn:
             f"{self.config.client_non_ssl_port}"
         )
 
-    def user_channels_info(self) -> str:
-        if not self.config.user_channels:
-            return ""
-
-        return f" Joined channels: {', '.join(self.config.user_channels)}"
-
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
 
@@ -380,7 +374,7 @@ class Conn:
             "MemoServ",
             f"SEND {nick} Your BNC auth is Username: {username} Password: "
             f"{passwd} {self.client_connect_info()} and /PASS "
-            f"{username}:{passwd}{self.user_channels_info()}",
+            f"{username}/{self.config.bnc_network}:{passwd}",
         )
         self.bnc_users[username] = host
         self.save_data()

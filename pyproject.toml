@@ -62,7 +62,7 @@ dependencies = [
     "hatch-pip-compile==1.11.6",
     "pip==26.2.1",
 ]
-pip-compile-hashes = true
+pip-compile-hashes = false
 pip-compile-resolver = "uv"
 pip-compile-installer = "uv"
 post-install-commands = [
@@ -74,7 +74,7 @@ post-install-commands = []
 extra-dependencies = ["pytest-asyncio"]
 type = "pip-compile"
 pip-compile-constraint = "default"
-pip-compile-hashes = true
+pip-compile-hashes = false
 pip-compile-resolver = "uv"
 pip-compile-installer = "uv"
 default-args = ["tests", "bncbot"]
@@ -91,7 +91,7 @@ python = ["3.14", "3.13", "3.12", "3.11", "3.10"]
 
 [tool.hatch.envs.hatch-static-analysis]
 type = "pip-compile"
-pip-compile-hashes = true
+pip-compile-hashes = false
 pip-compile-resolver = "uv"
 pip-compile-installer = "uv"
 pip-compile-constraint = "default"
@@ -99,7 +99,7 @@ post-install-commands = []
 
 [tool.hatch.envs.hatch-build]
 type = "pip-compile"
-pip-compile-hashes = true
+pip-compile-hashes = false
 pip-compile-resolver = "uv"
 pip-compile-installer = "uv"
 pip-compile-constraint = "default"

@@ -311,6 +311,7 @@ class Conn:
             self.config.pastebin_url,
             content.encode(),
             filename,
+            self.config.pastebin_field,
         )
 
     async def is_bnc_admin(self, name: str) -> bool:

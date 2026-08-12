@@ -127,16 +127,20 @@ def parse_znc_registry(path: Path) -> dict[str, str]:
 
 
 def upload_pastebin(
-    url: str, content: bytes, filename: str = "listusers.txt"
+    url: str,
+    content: bytes,
+    filename: str = "listusers.txt",
+    field: str = "file",
 ) -> str:
-    """Upload content to a 0x0.st/x0.at-compatible pastebin via a
-    multipart/form-data POST with a "file" field, returning the URL from
-    the plaintext response body. Blocking; run via an executor."""
+    """Upload content to a pastebin via a multipart/form-data POST,
+    returning the URL from the plaintext response body. The form field
+    name varies by provider (e.g. "file" for 0x0.st/x0.at, "raw" for
+    pinnwand's /curl endpoint). Blocking; run via an executor."""
     boundary = uuid.uuid4().hex
     body = (
         (
             f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
             "Content-Type: text/plain\r\n\r\n"
         ).encode()
         + content

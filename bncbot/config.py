@@ -39,6 +39,7 @@ class BotConfig(FileBasedDataModel):
     bind_host_net: str = "127.0.0.0/16"
     lastseen_registry_path: str = ""
     pastebin_url: str = ""
+    pastebin_field: str = "file"
 
     debug: bool = False
     log_to_file: bool = False

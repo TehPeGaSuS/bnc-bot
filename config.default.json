@@ -15,5 +15,6 @@
     "command_prefix": ".",
     "bind_host_net": "127.0.0.0/16",
     "lastseen_registry_path": "",
-    "pastebin_url": ""
+    "pastebin_url": "",
+    "pastebin_field": "file"
 }

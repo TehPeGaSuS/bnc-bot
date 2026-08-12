@@ -6,8 +6,7 @@
     ":separateMajorReleases",
     ":separateMultipleMajorReleases",
     ":separateMultipleMinorReleases",
-    ":separatePatchReleases",
-    "docker:pinDigests"
+    ":separatePatchReleases"
   ],
   "packageRules": [
     {

@@ -111,7 +111,9 @@ def parse_znc_registry(path: Path) -> dict[str, str]:
     if not path.exists():
         return result
 
-    for raw_line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for raw_line in path.read_text(
+        encoding="utf-8", errors="replace"
+    ).splitlines():
         line = raw_line.strip()
         if not line:
             continue

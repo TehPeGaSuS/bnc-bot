@@ -19,6 +19,10 @@ This bot may work with other systems, but this is the setup it was specifically 
 - `lastseen_registry_path`: path to ZNC's `lastseen` module registry file (e.g.
   `/home/bnc/.znc/moddata/lastseen/.registry`), read directly from disk rather than queried over IRC to avoid
   flooding on BNC setups with many users. Enables the `lastseen <user>` command; leave empty to disable it.
+- `pastebin_url`: upload endpoint for the `listusers` command, e.g. `https://0x0.st/`, `https://x0.at/`, or a
+  self-hosted equivalent. Must accept a `multipart/form-data` POST with a `file` field and respond with the
+  plaintext paste URL (the convention used by 0x0.st/x0.at and most compatible self-hosted clones). Leave empty
+  to disable `listusers`.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range
@@ -70,6 +74,10 @@ Update the cached version of the BNC user list
 
 #### `lastseen <username>`
 Show when [username] was last seen connected to the BNC (requires `lastseen_registry_path` to be configured)
+
+#### `listusers`
+Upload the full list of BNC users and their bindhosts to a pastebin and reply with the URL (requires
+`pastebin_url` to be configured). Uploading avoids flooding the channel/PM on BNCs with many users.
 
 ## Credits
 This project is forked from [TotallyNotRobots/bnc-bot](https://github.com/TotallyNotRobots/bnc-bot).

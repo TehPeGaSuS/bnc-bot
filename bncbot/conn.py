@@ -300,6 +300,19 @@ class Conn:
         # naive/local to match ZNC's own strftime("%c", localtime(...)) display
         return datetime.fromtimestamp(timestamp).strftime("%c")  # noqa: DTZ006
 
+    async def upload_pastebin(self, content: str, filename: str) -> str:
+        if not self.config.pastebin_url:
+            raise ValueError
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            util.upload_pastebin,
+            self.config.pastebin_url,
+            content.encode(),
+            filename,
+        )
+
     async def is_bnc_admin(self, name: str) -> bool:
         lock = self.locks["controlpanel_bncadmin"]
         async with lock:

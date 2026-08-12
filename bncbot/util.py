@@ -7,6 +7,8 @@ import hashlib
 import random
 import secrets
 import string
+import urllib.request
+import uuid
 from collections.abc import Iterable
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from pathlib import Path
@@ -122,3 +124,30 @@ def parse_znc_registry(path: Path) -> dict[str, str]:
         result[znc_registry_decode(key)] = znc_registry_decode(value)
 
     return result
+
+
+def upload_pastebin(
+    url: str, content: bytes, filename: str = "listusers.txt"
+) -> str:
+    """Upload content to a 0x0.st/x0.at-compatible pastebin via a
+    multipart/form-data POST with a "file" field, returning the URL from
+    the plaintext response body. Blocking; run via an executor."""
+    boundary = uuid.uuid4().hex
+    body = (
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+            "Content-Type: text/plain\r\n\r\n"
+        ).encode()
+        + content
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return resp.read().decode().strip()

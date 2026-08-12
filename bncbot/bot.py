@@ -284,6 +284,30 @@ async def cmd_lastseen(text: str, conn: "Conn", event: "CommandEvent") -> None:
         event.message(f"{acct} was last seen: {seen}")
 
 
+@command("listusers", "bncusers", admin=True, require_param=False)
+async def cmd_listusers(
+    bnc_users: BNCUsers, conn: "Conn", event: "CommandEvent"
+) -> None:
+    """- Upload the full list of BNC users to a pastebin"""
+    if not bnc_users:
+        event.message("No BNC users")
+        return
+
+    lines = [
+        f"{nick} {host or '(no bindhost)'}"
+        for nick, host in sorted(bnc_users.items())
+    ]
+    content = "\n".join(lines)
+
+    try:
+        url = await conn.upload_pastebin(content, "bnc-users.txt")
+    except ValueError:
+        event.message("pastebin_url is not configured")
+        return
+
+    event.message(f"BNC user list ({len(bnc_users)} users): {url}")
+
+
 @command("delbnc", admin=True)
 async def cmd_delbnc(
     text: str,

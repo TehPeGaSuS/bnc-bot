@@ -26,6 +26,8 @@ This bot may work with other systems, but this is the setup it was specifically 
   [single_php_filehost](https://github.com/Rouji/single_php_filehost), a lightweight self-hosted x0.at-compatible
   option). For [pinnwand](https://supakeen.com/project/pinnwand/)'s `/curl` endpoint, set `pastebin_field` to
   `raw` instead.
+- `min_registered_days`: minimum age (in days) a services account must have before it may request a BNC, based on
+  the registration date returned by NickServ's `INFO`. `0` (default) disables the check.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range

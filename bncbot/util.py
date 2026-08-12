@@ -5,14 +5,18 @@
 
 import hashlib
 import random
+import re
 import secrets
 import string
 import urllib.request
 import uuid
 from collections.abc import Iterable
+from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from pathlib import Path
 from typing import TypeAlias
+
+REGISTERED_DATE_RE = re.compile(r"^(.*?\d{4})\s+UTC\b")
 
 VALID_USER_CHARS = f"{string.ascii_letters + string.digits}-_"
 VALID_USER_START_CHARS = string.ascii_letters
@@ -84,6 +88,24 @@ def sanitize_username(user: str) -> str:
 
 def get_random_address(net: IPNetwork) -> IPAddress:
     return net[random.randrange(net.num_addresses)]
+
+
+def registered_age_days(nickserv_info: str) -> int | None:
+    """Parse the age in days from a NickServ INFO registration string,
+    e.g. "May 30 00:53:54 2017 UTC (5 days, 19 minutes ago)". Returns
+    None if the leading UTC timestamp can't be parsed."""
+    match = REGISTERED_DATE_RE.match(nickserv_info)
+    if not match:
+        return None
+
+    try:
+        registered = datetime.strptime(
+            match.group(1), "%b %d %H:%M:%S %Y"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+    return (datetime.now(timezone.utc) - registered).days
 
 
 def znc_registry_decode(value: str) -> str:

@@ -443,6 +443,17 @@ async def cmd_requestbnc(
             )
             return
 
+    if conn.config.min_registered_days:
+        age_days = util.registered_age_days(registered_time)
+        if age_days is not None and age_days < conn.config.min_registered_days:
+            event.message(
+                f"Your account must be registered for at least "
+                f"{conn.config.min_registered_days} day(s) before "
+                f"requesting a BNC. Registered {registered_time}",
+                nick,
+            )
+            return
+
     conn.add_queue(acct, registered_time)
     event.message("BNC request submitted.", nick)
     conn.chan_log(f"{acct} added to bnc queue. Registered {registered_time}")

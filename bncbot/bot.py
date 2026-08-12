@@ -83,6 +83,12 @@ async def on_raw(conn: "Conn", event: "RawEvent", irc_command: str) -> None:
         await conn.launch_hook(event, handler)
 
 
+@raw("001")
+def on_welcome(conn: "Conn") -> None:
+    for chan in conn.config.channels:
+        conn.send("JOIN", chan)
+
+
 @raw("JOIN")
 def on_join(conn: "Conn", chan: str | None, nick: str | None) -> None:
     if (

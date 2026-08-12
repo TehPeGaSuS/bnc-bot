@@ -35,6 +35,8 @@ class BotConfig(FileBasedDataModel):
     client_non_ssl_port: int = 5456
     admins: list[str] = ["*!*@snoonet/staff/*", "*!*@snoonet/manager/*"]
     log_channel: str = "##log_channel"
+    channels: list[str] = []
+    user_channels: list[str] = []
     command_prefix: str = "."
     bind_host_net: str = "127.0.0.0/16"
     lastseen_registry_path: str = ""

@@ -28,6 +28,10 @@ This bot may work with other systems, but this is the setup it was specifically 
   `raw` instead.
 - `min_registered_days`: minimum age (in days) a services account must have before it may request a BNC, based on
   the registration date returned by NickServ's `INFO`. `0` (default) disables the check.
+- `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
+  there but never joins it automatically otherwise).
+- `user_channels`: channels suggested to users in the credentials memo sent when their BNC account is created.
+  Purely informational; the bot does not invite or join users to these itself.
 
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range

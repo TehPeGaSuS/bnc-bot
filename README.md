@@ -28,7 +28,8 @@ This bot may work with other systems, but this is the setup it was specifically 
   option). For [pinnwand](https://supakeen.com/project/pinnwand/)'s `/curl` endpoint, set `pastebin_field` to
   `raw` instead.
 - `min_registered_days`: minimum age (in days) a services account must have before it may request a BNC, based on
-  the registration date returned by NickServ's `INFO`. `0` (default) disables the check.
+  the registration date returned by NickServ's `INFO`. `0` disables the check; `config.default.json` ships with
+  `7`.
 - `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
   there but never joins it automatically otherwise).
 - `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via

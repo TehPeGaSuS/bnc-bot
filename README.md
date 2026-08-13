@@ -2,9 +2,10 @@
 A bot to handle BNC account requests for IRC networks
 
 ## Designed for
-- [Anope](https://anope.org) IRC Services v2.0.15
-- [ZNC](https://znc.in) v1.8.2
+- [Anope](https://anope.org) IRC Services v2.0.15+ (tested up to v2.1.x)
+- [ZNC](https://znc.in) v1.8+ (tested up to v1.11.x)
 - [InspIRCd](https://inspircd.org) with the `m_services_account` module
+- [UnrealIRCd](https://www.unrealircd.org)
 
 This bot may work with other systems, but this is the setup it was specifically written to work with
 

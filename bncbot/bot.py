@@ -325,6 +325,14 @@ async def cmd_listusers(
     event.message(f"BNC user list ({len(bnc_users)} users): {url}")
 
 
+@command("blockbnc", admin=True)
+async def cmd_blockbnc(text: str, conn: "Conn", event: "CommandEvent") -> None:
+    """<user> - Block [user] via the blockuser module"""
+    acct = text.split()[0]
+    conn.module_msg("blockuser", f"Block {acct}")
+    event.message(f"Block requested for {acct}")
+
+
 @command("unblockbnc", admin=True)
 async def cmd_unblockbnc(
     text: str, conn: "Conn", event: "CommandEvent"

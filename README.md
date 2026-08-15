@@ -137,6 +137,9 @@ Show when [username] was last seen connected to the BNC (requires `lastseen_regi
 Upload the full list of BNC users and their bindhosts to a pastebin and reply with the URL (requires
 `pastebin_url` to be configured). Uploading avoids flooding the channel/PM on BNCs with many users.
 
+#### `blockbnc <username>`
+Block [username] via the `blockuser` module
+
 #### `unblockbnc <username>`
 Unblock [username] via the `blockuser` module
 

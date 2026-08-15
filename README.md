@@ -79,6 +79,12 @@ distros may need adjusted paths/commands.
    systemctl enable --now net.ipv6.ip_nonlocal_bind.service
    ```
 
+4. Change your `bind_host_net` to the same subnet:
+
+   ```
+   "bind_host_net": "2001:db8:0:0::/96",
+   ```
+
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range
 - Generates a temporary password for a user on request approval and sends it to them through MemoServ

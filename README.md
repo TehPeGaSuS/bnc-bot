@@ -44,13 +44,10 @@ an interface.
 Tested on Ubuntu 24.04+ and should work unmodified on other Debian-based systems (systemd + `sysctl.d`). Other
 distros may need adjusted paths/commands.
 
-1. Add a local route for your subnet (replace `2001:db8:0:0::/96` with your own):
+1. Create `/etc/systemd/system/net.ipv6.ip_nonlocal_bind.service` to add a local route for your subnet (replace
+   `2001:db8:0:0::/96` with your own):
 
    ```
-   # /etc/systemd/system/net.ipv6.ip_nonlocal_bind.service
-   #
-   # Replace '2001:db8:0:0::/96' with your IPv6 subnet
-
    [Unit]
    Description=Local routing table for IPv6
    After=network-online.target
@@ -65,10 +62,9 @@ distros may need adjusted paths/commands.
    WantedBy=multi-user.target
    ```
 
-2. Enable non-local binding:
+2. Create `/etc/sysctl.d/99-net.ipv6.ip_nonlocal_bind.conf` to enable non-local binding:
 
    ```
-   # /etc/sysctl.d/99-net.ipv6.ip_nonlocal_bind.conf
    net.ipv6.ip_nonlocal_bind = 1
    ```
 

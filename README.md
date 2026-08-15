@@ -41,6 +41,9 @@ system. If you'd rather assign bindhosts from an IPv6 subnet, the kernel needs `
 and a local route for that subnet on `lo`, otherwise ZNC can't bind to addresses that aren't actually configured on
 an interface.
 
+Tested on Ubuntu 24.04+ and should work unmodified on other Debian-based systems (systemd + `sysctl.d`). Other
+distros may need adjusted paths/commands.
+
 1. Add a local route for your subnet (replace `2001:db8:0:0::/96` with your own):
 
    ```

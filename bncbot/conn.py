@@ -160,6 +160,11 @@ class Conn:
             self.get_user_hosts,
             initial_interval=timedelta(hours=8),
         )
+        if self.config.max_inactive_days:
+            self.create_timer(
+                timedelta(hours=self.config.inactive_check_interval_hours),
+                self.check_inactive_users,
+            )
 
     def send(self, *parts: str) -> None:
         if not self._protocol:
@@ -299,6 +304,54 @@ class Conn:
 
         # naive/local to match ZNC's own strftime("%c", localtime(...)) display
         return datetime.fromtimestamp(timestamp).strftime("%c")  # noqa: DTZ006
+
+    def get_lastseen_days(self, username: str) -> int | None:
+        """Days since a user was last seen connected, or None if there's no
+        recorded entry. Raises ValueError if lastseen_registry_path isn't
+        configured."""
+        if not self.config.lastseen_registry_path:
+            raise ValueError
+
+        self._refresh_lastseen()
+        raw = self._lastseen_cache.get(username)
+        if raw is None:
+            return None
+
+        try:
+            timestamp = int(raw)
+        except ValueError:
+            return None
+
+        seen = datetime.fromtimestamp(timestamp)  # noqa: DTZ006
+        return (datetime.now() - seen).days  # noqa: DTZ005
+
+    async def check_inactive_users(self) -> None:
+        """Rotate the password (and disconnect) any BNC user inactive for
+        longer than max_inactive_days, locking them out while keeping the
+        account intact (ZNC has no native per-user disable flag)."""
+        max_days = self.config.max_inactive_days
+        if not max_days or not self.config.lastseen_registry_path:
+            return
+
+        for user in list(self.bnc_users):
+            try:
+                days = self.get_lastseen_days(user)
+            except ValueError:
+                return
+
+            if days is None or days < max_days:
+                continue
+
+            passwd = util.gen_pass()
+            self.module_msg("controlpanel", f"Set Password {user} {passwd}")
+            self.module_msg(
+                "controlpanel", f"Disconnect {user} {self.config.bnc_network}"
+            )
+            self.chan_log(
+                f"{user} has been locked out (inactive {days} days)"
+            )
+
+        self.send("znc saveconfig")
 
     async def upload_pastebin(self, content: str, filename: str) -> str:
         if not self.config.pastebin_url:

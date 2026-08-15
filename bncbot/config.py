@@ -43,6 +43,8 @@ class BotConfig(FileBasedDataModel):
     pastebin_url: str = "https://x0.at"
     pastebin_field: str = "file"
     min_registered_days: int = 0
+    max_inactive_days: int = 0
+    inactive_check_interval_hours: int = 24
 
     debug: bool = False
     log_to_file: bool = False

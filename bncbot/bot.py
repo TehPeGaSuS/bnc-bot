@@ -299,12 +299,18 @@ async def cmd_listusers(
         event.message("No BNC users")
         return
 
+    try:
+        blocked = conn.get_blocked_users()
+    except ValueError:
+        blocked = set()
+
     lines = [
         "ZNC Users",
         "---------",
         "",
         *(
             f"{nick} - {host or '(no bindhost)'}"
+            f"{' (blocked)' if nick in blocked else ''}"
             for nick, host in sorted(bnc_users.items())
         ),
     ]

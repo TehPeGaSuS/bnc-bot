@@ -319,6 +319,44 @@ async def cmd_listusers(
     event.message(f"BNC user list ({len(bnc_users)} users): {url}")
 
 
+@command("unblockbnc", admin=True)
+async def cmd_unblockbnc(
+    text: str, conn: "Conn", event: "CommandEvent"
+) -> None:
+    """<user> - Unblock [user] via the blockuser module"""
+    acct = text.split()[0]
+    conn.module_msg("blockuser", f"Unblock {acct}")
+    event.message(f"Unblock requested for {acct}")
+
+
+@command("listblocked", "bncblocked", admin=True, require_param=False)
+async def cmd_listblocked(conn: "Conn", event: "CommandEvent") -> None:
+    """- List BNC users blocked via the blockuser module"""
+    try:
+        blocked = conn.get_blocked_users()
+    except ValueError:
+        event.message("blockuser_registry_path is not configured")
+        return
+
+    if not blocked:
+        event.message("No blocked users")
+        return
+
+    lines = sorted(blocked)
+    if len(lines) <= 2:
+        event.message(f"Blocked users: {', '.join(lines)}")
+        return
+
+    content = "\n".join(["Blocked BNC Users", "-----------------", "", *lines])
+    try:
+        url = await conn.upload_pastebin(content, "blocked-users.txt")
+    except ValueError:
+        event.message("pastebin_url is not configured")
+        return
+
+    event.message(f"Blocked user list ({len(lines)} users): {url}")
+
+
 @command("delbnc", admin=True)
 async def cmd_delbnc(
     text: str,

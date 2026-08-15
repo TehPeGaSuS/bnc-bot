@@ -34,8 +34,11 @@ This bot may work with other systems, but this is the setup it was specifically 
   (every `inactive_check_interval_hours`, default `24`) checks each BNC user's last-seen time (requires
   `lastseen_registry_path`) and, if inactive longer than `max_inactive_days`, blocks them via ZNC's `blockuser`
   module — severing their current connections and refusing further logins, while leaving the account itself
-  intact. Requires the `blockuser` module to be loaded globally. Re-enable with `Unblock <user>` via `blockuser`.
-  `0` disables the check.
+  intact. Requires the `blockuser` module to be loaded globally. Re-enable with `unblockbnc` (or `Unblock <user>`
+  via `blockuser` directly). `0` disables the check.
+- `blockuser_registry_path`: path to the `blockuser` module's registry file (e.g.
+  `/home/bnc/.znc/moddata/blockuser/.registry`), read directly from disk to list currently blocked users. Enables
+  the `listblocked` command; leave empty to disable it.
 - `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
   there but never joins it automatically otherwise).
 - `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via
@@ -133,6 +136,13 @@ Show when [username] was last seen connected to the BNC (requires `lastseen_regi
 #### `listusers`
 Upload the full list of BNC users and their bindhosts to a pastebin and reply with the URL (requires
 `pastebin_url` to be configured). Uploading avoids flooding the channel/PM on BNCs with many users.
+
+#### `unblockbnc <username>`
+Unblock [username] via the `blockuser` module
+
+#### `listblocked`
+List BNC users blocked via the `blockuser` module (requires `blockuser_registry_path` to be configured). Replies
+inline for 2 or fewer users, otherwise uploads to a pastebin like `listusers`.
 
 ## Credits
 This project is forked from [TotallyNotRobots/bnc-bot](https://github.com/TotallyNotRobots/bnc-bot).

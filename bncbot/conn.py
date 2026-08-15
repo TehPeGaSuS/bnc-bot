@@ -47,6 +47,8 @@ class Conn:
         self.config = BotConfig.load_config(self.config_file)
         self._lastseen_cache: dict[str, str] = {}
         self._lastseen_mtime: float | None = None
+        self._blocked_cache: set[str] = set()
+        self._blocked_mtime: float | None = None
         if not self.log_dir.exists():
             self.log_dir.mkdir()
 
@@ -333,7 +335,15 @@ class Conn:
         if not max_days or not self.config.lastseen_registry_path:
             return
 
+        try:
+            blocked = self.get_blocked_users()
+        except ValueError:
+            blocked = set()
+
         for user in list(self.bnc_users):
+            if user in blocked:
+                continue
+
             try:
                 days = self.get_lastseen_days(user)
             except ValueError:
@@ -344,6 +354,28 @@ class Conn:
 
             self.module_msg("blockuser", f"Block {user}")
             self.chan_log(f"{user} has been blocked (inactive {days} days)")
+
+    def _refresh_blocked(self) -> None:
+        path = Path(self.config.blockuser_registry_path)
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            self._blocked_cache = set()
+            self._blocked_mtime = None
+            return
+
+        if mtime != self._blocked_mtime:
+            self._blocked_cache = set(util.parse_znc_registry(path))
+            self._blocked_mtime = mtime
+
+    def get_blocked_users(self) -> set[str]:
+        """Return the set of usernames blocked via the blockuser module.
+        Raises ValueError if blockuser_registry_path isn't configured."""
+        if not self.config.blockuser_registry_path:
+            raise ValueError
+
+        self._refresh_blocked()
+        return set(self._blocked_cache)
 
     async def upload_pastebin(self, content: str, filename: str) -> str:
         if not self.config.pastebin_url:

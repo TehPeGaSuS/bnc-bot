@@ -32,9 +32,10 @@ This bot may work with other systems, but this is the setup it was specifically 
   `7`.
 - `max_inactive_days` / `inactive_check_interval_hours`: if `max_inactive_days` is non-zero, the bot periodically
   (every `inactive_check_interval_hours`, default `24`) checks each BNC user's last-seen time (requires
-  `lastseen_registry_path`) and, if inactive longer than `max_inactive_days`, rotates their password to a random
-  value and disconnects them — locking them out while leaving the account itself intact (ZNC has no native per-user
-  disable flag). Re-enable with `bncresetpass`. `0` disables the check.
+  `lastseen_registry_path`) and, if inactive longer than `max_inactive_days`, blocks them via ZNC's `blockuser`
+  module — severing their current connections and refusing further logins, while leaving the account itself
+  intact. Requires the `blockuser` module to be loaded globally. Re-enable with `Unblock <user>` via `blockuser`.
+  `0` disables the check.
 - `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
   there but never joins it automatically otherwise).
 - `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via

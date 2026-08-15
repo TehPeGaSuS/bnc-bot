@@ -326,9 +326,9 @@ class Conn:
         return (datetime.now() - seen).days  # noqa: DTZ005
 
     async def check_inactive_users(self) -> None:
-        """Rotate the password (and disconnect) any BNC user inactive for
-        longer than max_inactive_days, locking them out while keeping the
-        account intact (ZNC has no native per-user disable flag)."""
+        """Block any BNC user inactive for longer than max_inactive_days via
+        the blockuser module, severing their existing connections and
+        refusing further logins while keeping the account intact."""
         max_days = self.config.max_inactive_days
         if not max_days or not self.config.lastseen_registry_path:
             return
@@ -342,16 +342,8 @@ class Conn:
             if days is None or days < max_days:
                 continue
 
-            passwd = util.gen_pass()
-            self.module_msg("controlpanel", f"Set Password {user} {passwd}")
-            self.module_msg(
-                "controlpanel", f"Disconnect {user} {self.config.bnc_network}"
-            )
-            self.chan_log(
-                f"{user} has been locked out (inactive {days} days)"
-            )
-
-        self.send("znc saveconfig")
+            self.module_msg("blockuser", f"Block {user}")
+            self.chan_log(f"{user} has been blocked (inactive {days} days)")
 
     async def upload_pastebin(self, content: str, filename: str) -> str:
         if not self.config.pastebin_url:

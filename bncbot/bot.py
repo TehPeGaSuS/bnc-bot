@@ -332,6 +332,7 @@ async def cmd_unblockbnc(
     """<user> - Unblock [user] via the blockuser module"""
     acct = text.split()[0]
     conn.module_msg("blockuser", f"Unblock {acct}")
+    conn.module_msg("controlpanel", f"Reconnect {acct} {conn.config.bnc_network}")
     event.message(f"Unblock requested for {acct}")
 
 

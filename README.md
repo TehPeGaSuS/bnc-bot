@@ -35,6 +35,47 @@ This bot may work with other systems, but this is the setup it was specifically 
 - `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via
   `controlpanel`'s `AddChan`), so ZNC joins them for the user on connect.
 
+## IPv6 bindhosts
+By default, bindhosts are assigned in the 127.0.0.0/16 IPv4 loopback range, which works out of the box on any
+system. If you'd rather assign bindhosts from an IPv6 subnet, the kernel needs `net.ipv6.ip_nonlocal_bind` enabled
+and a local route for that subnet on `lo`, otherwise ZNC can't bind to addresses that aren't actually configured on
+an interface.
+
+1. Add a local route for your subnet (replace `2001:db8:0:0::/96` with your own):
+
+   ```
+   # /etc/systemd/system/net.ipv6.ip_nonlocal_bind.service
+   #
+   # Replace '2001:db8:0:0::/96' with your IPv6 subnet
+
+   [Unit]
+   Description=Local routing table for IPv6
+   After=network-online.target
+   Wants=network-online.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/sbin/ip route add local 2001:db8:0:0::/96 dev lo
+   RemainAfterExit=yes
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+2. Enable non-local binding:
+
+   ```
+   # /etc/sysctl.d/99-net.ipv6.ip_nonlocal_bind.conf
+   net.ipv6.ip_nonlocal_bind = 1
+   ```
+
+3. Apply and enable both:
+
+   ```
+   sysctl --system
+   systemctl enable --now net.ipv6.ip_nonlocal_bind.service
+   ```
+
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range
 - Generates a temporary password for a user on request approval and sends it to them through MemoServ

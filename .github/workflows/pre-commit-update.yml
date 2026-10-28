@@ -29,4 +29,4 @@ jobs:
           labels: "update"
           reviewers: "pegasus"
           assignees: "pegasus"
-          sign-commits: true
+          sign-commits: false

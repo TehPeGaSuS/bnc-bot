@@ -11,6 +11,14 @@ This bot may work with other systems, but this is the setup it was specifically 
 
 ## Requirements
 - Python 3.10+
+- A ZNC user named `BNCClient` to serve as the template for new accounts (see [Setup](#setup) below)
+
+## Setup
+New BNC accounts are created by cloning a ZNC user named `BNCClient` (via `cloneuser BNCClient <username>`), then
+overriding the password, bindhost, nick, altnick, ident, and realname for the new user. This `BNCClient` user must
+exist on the ZNC server beforehand, and any other settings on it (attached networks, channels, modules, buffer
+sizes, etc.) will be inherited by every new account created by the bot.
+
 ## Configuration Notes
 - `bnc_network`: name of the ZNC network the bot reconnects new users to after account creation. This must match a
   network already attached to the ZNC template used for new accounts.

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 keywords = []
-authors = [{name = "linuxdaemon", email = "linuxdaemon.irc@gmail.com"}]
+authors = [{ name = "linuxdaemon", email = "linuxdaemon.irc@gmail.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python",
@@ -24,9 +24,9 @@ classifiers = [
 dependencies = [
     "async-irc==0.3.0",
     "typing_extensions==4.16.0",
-    "pydantic==2.13.4",
+    "pydantic==2.13.5",
     "aiofiles==25.1.0",
-    "typer==0.27.1",
+    "typer==0.27.2",
 ]
 
 [project.urls]
@@ -49,22 +49,12 @@ packages = ["bncbot"]
 [tool.hatch.build.hooks.vcs]
 version-file = "bncbot/_version.py"
 
-[tool.hatch.env]
-requires = [
-    "hatch-pip-compile",
-]
-
 [tool.hatch.envs.default]
-type = "pip-compile"
 dependencies = [
-    "pre-commit==4.6.1",
+    "pre-commit==4.6.2",
     "pytest==9.1.1",
-    "hatch-pip-compile==1.11.6",
     "pip==26.2.1",
 ]
-pip-compile-hashes = false
-pip-compile-resolver = "uv"
-pip-compile-installer = "uv"
 post-install-commands = [
     "hatch run pre-commit:install",
 ]
@@ -72,11 +62,6 @@ post-install-commands = [
 [tool.hatch.envs.hatch-test]
 post-install-commands = []
 extra-dependencies = ["pytest-asyncio"]
-type = "pip-compile"
-pip-compile-constraint = "default"
-pip-compile-hashes = false
-pip-compile-resolver = "uv"
-pip-compile-installer = "uv"
 default-args = ["tests", "bncbot"]
 extra-args = ["-vv", "--doctest-modules"]
 
@@ -90,24 +75,14 @@ cov-report = ["coverage report --show-missing --skip-covered", "coverage xml"]
 python = ["3.14", "3.13", "3.12", "3.11", "3.10"]
 
 [tool.hatch.envs.hatch-static-analysis]
-type = "pip-compile"
-pip-compile-hashes = false
-pip-compile-resolver = "uv"
-pip-compile-installer = "uv"
-pip-compile-constraint = "default"
 post-install-commands = []
 
 [tool.hatch.envs.hatch-build]
-type = "pip-compile"
-pip-compile-hashes = false
-pip-compile-resolver = "uv"
-pip-compile-installer = "uv"
-pip-compile-constraint = "default"
 post-install-commands = []
 
 [tool.hatch.envs.pre-commit]
 extra-dependencies = [
-    "pre-commit==4.6.1",
+    "pre-commit==4.6.2",
 ]
 post-install-commands = []
 
@@ -118,7 +93,7 @@ install = "pre-commit install -f"
 [tool.hatch.envs.types]
 template = "hatch-test"
 extra-dependencies = [
-    "mypy==2.3.0",
+    "mypy==2.3.1",
     "types-aiofiles==25.1.0.20260518",
 ]
 post-install-commands = []

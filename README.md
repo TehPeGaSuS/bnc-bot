@@ -57,6 +57,12 @@ an interface.
 Tested on Ubuntu 24.04+ and should work unmodified on other Debian-based systems (systemd + `sysctl.d`). Other
 distros may need adjusted paths/commands.
 
+**Choosing a host.** Rather than recommending providers (that changes too often), look for two things:
+
+- the provider routes a whole IPv6 subnet to your server, which the test below checks;
+- its acceptable use policy allows IRC bouncers. Some hosts forbid them, or treat them as abuse once someone
+  complains, however well the rest of the setup works.
+
 **Check your provider first.** This only works if your hosting provider routes the whole subnet to your machine.
 Some cloud providers instead require every address to be assigned to the network interface through their own panel
 or API, and silently drop traffic from any other address in the subnet. There, binding to the address succeeds but

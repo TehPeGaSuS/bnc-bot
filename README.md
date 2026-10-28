@@ -57,6 +57,29 @@ an interface.
 Tested on Ubuntu 24.04+ and should work unmodified on other Debian-based systems (systemd + `sysctl.d`). Other
 distros may need adjusted paths/commands.
 
+**Check your provider first.** This only works if your hosting provider routes the whole subnet to your machine.
+Some cloud providers instead require every address to be assigned to the network interface through their own panel
+or API, and silently drop traffic from any other address in the subnet. There, binding to the address succeeds but
+the connection never gets out, whatever you configure on the machine. Which providers do this varies and changes
+over time, so take any list you find with a grain of salt and test your own machine before setting anything up.
+As root, with an address from your subnet that isn't configured on any interface:
+
+```
+ip route add local 2001:db8:0:0::/96 dev lo
+sysctl -w net.ipv6.ip_nonlocal_bind=1
+curl -6 --max-time 10 --interface 2001:db8::dead:beef https://ifconfig.co
+```
+
+If the address you picked comes back, the subnet is routed to you; continue with the steps below. Either way, undo
+the test first with `ip route del local 2001:db8:0:0::/96 dev lo` and `sysctl -w net.ipv6.ip_nonlocal_bind=0` (the
+steps below make both permanent).
+
+If it times out, the subnet isn't routed to you and the steps below won't work, but IPv6 bindhosts still can: add
+each one to the network interface yourself (in netplan or whatever manages your network, and in your provider's
+panel if it requires that). Set `bind_host_net` as in step 4 and skip steps 1-3. The bot logs every new account's
+bindhost to `log_channel` (`<user> was assigned bindhost <address>`), so you know which address to add; the account
+can't connect to IRC until you have.
+
 1. Create `/etc/systemd/system/net.ipv6.ip_nonlocal_bind.service` to add a local route for your subnet (replace
    `2001:db8:0:0::/96` with your own):
 

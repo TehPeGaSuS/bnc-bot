@@ -57,11 +57,15 @@ an interface.
 Tested on Ubuntu 24.04+ and should work unmodified on other Debian-based systems (systemd + `sysctl.d`). Other
 distros may need adjusted paths/commands.
 
-**Choosing a host.** Rather than recommending providers (that changes too often), look for two things:
+**Choosing a host.** Rather than recommending providers (that changes too often), look for three things:
 
 - the provider routes a whole IPv6 subnet to your server, which the test below checks;
 - its acceptable use policy allows IRC bouncers. Some hosts forbid them, or treat them as abuse once someone
-  complains, however well the rest of the setup works.
+  complains, however well the rest of the setup works;
+- how the provider handles DDoS attacks against you. Bouncers attract them. Some providers filter attacks as part
+  of the service; others cut your server off until it stops, and may close the account if an attack lasts or
+  affects other customers, even when their acceptable use policy doesn't mention bouncers. Find out before your
+  users depend on the server.
 
 **Check your provider first.** This only works if your hosting provider routes the whole subnet to your machine.
 Some cloud providers instead require every address to be assigned to the network interface through their own panel

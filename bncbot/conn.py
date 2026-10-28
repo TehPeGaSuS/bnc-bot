@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from asyncirc.protocol import IrcProtocol
 from asyncirc.server import Server
 
-from bncbot import irc, util
+from bncbot import irc, shared_ip, util
 from bncbot.async_util import call_func, timer
 from bncbot.bot import Handlers
 from bncbot.config import BNCData, BNCQueue, BNCUsers, BotConfig
@@ -49,6 +49,9 @@ class Conn:
         self._lastseen_mtime: float | None = None
         self._blocked_cache: set[str] = set()
         self._blocked_mtime: float | None = None
+        self.shared_ip = shared_ip.SharedIPTracker(
+            timedelta(hours=self.config.shared_ip_window_hours)
+        )
         if not self.log_dir.exists():
             self.log_dir.mkdir()
 
@@ -376,6 +379,51 @@ class Conn:
 
         self._refresh_blocked()
         return set(self._blocked_cache)
+
+    def is_shared_ip_exempt(self, user: str, ip: util.IPAddress) -> bool:
+        if user.lower() == self.config.user.lower() or user.lower() in {
+            u.lower() for u in self.config.shared_ip_exempt_users
+        }:
+            return True
+
+        return any(
+            ip in ipaddress.ip_network(net, strict=False)
+            for net in self.config.shared_ip_exempt_nets
+        )
+
+    def handle_client_event(self, event: shared_ip.ClientEvent) -> None:
+        """Track a notify_connect attach/detach and, with block_shared_ip
+        enabled, block every account attaching from the same IP prefix as
+        another account via the blockuser module."""
+        if not self.config.block_shared_ip:
+            return
+
+        user = shared_ip.resolve_username(event.client, self.bnc_users)
+        if self.is_shared_ip_exempt(user, event.ip):
+            return
+
+        prefix = shared_ip.ip_prefix(
+            event.ip,
+            self.config.shared_ip_v4_prefix,
+            self.config.shared_ip_v6_prefix,
+        )
+        if not event.attached:
+            self.shared_ip.detach(user, prefix)
+            return
+
+        others = self.shared_ip.attach(user, prefix)
+        if not others:
+            return
+
+        offenders = sorted({user, *others})
+        for name in offenders:
+            self.module_msg("blockuser", f"Block {name}")
+            self.shared_ip.forget(name)
+
+        self.chan_log(
+            f"Blocked {', '.join(offenders)} (shared IP: {event.ip} in "
+            f"{prefix})"
+        )
 
     async def upload_pastebin(self, content: str, filename: str) -> str:
         if not self.config.pastebin_url:

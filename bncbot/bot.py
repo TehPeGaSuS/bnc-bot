@@ -11,7 +11,7 @@ from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict, TypeVar
 
-from bncbot import util
+from bncbot import shared_ip, util
 from bncbot.config import BNCQueue, BNCUsers
 from bncbot.event import CommandEvent, RawEvent
 from bncbot.util import chunk_str, sanitize_username
@@ -125,10 +125,19 @@ async def on_whois_acct(conn: "Conn", irc_paramlist: list[str]) -> None:
 
 @raw("NOTICE")
 async def on_notice(
-    irc_paramlist: list[str], conn: "Conn", nick: str | None
+    irc_paramlist: list[str], conn: "Conn", nick: str | None, host: str | None
 ) -> None:
-    """Handle NickServ info responses"""
+    """Handle NickServ info responses and notify_connect broadcasts"""
     message = irc_paramlist[-1]
+    if (
+        nick
+        and host == "znc.in"
+        and nick == f"{conn.prefix}status"
+        and (client_event := shared_ip.parse_notify_connect(message))
+    ):
+        conn.handle_client_event(client_event)
+        return
+
     if nick and nick.lower() == "nickserv" and ":" in message:
         conn.logger.debug("Got nickserv message: %s", message)
         # Registered: May 30 00:53:54 2017 UTC (5 days, 19 minutes ago)

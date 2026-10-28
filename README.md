@@ -44,6 +44,20 @@ sizes, etc.) will be inherited by every new account created by the bot.
   module — severing their current connections and refusing further logins, while leaving the account itself
   intact. Requires the `blockuser` module to be loaded globally. Re-enable with `unblockbnc` (or `Unblock <user>`
   via `blockuser` directly). `0` disables the check.
+- `block_shared_ip`: if `true`, the bot blocks (via `blockuser`) every BNC account that attaches from the same IP
+  prefix as a different account. Client IPs come from ZNC's `notify_connect` global module, which must be loaded
+  (`/msg *status LoadMod --type=global notify_connect`) and broadcasts attaches/detaches to admin users; the bot's
+  ZNC user must therefore be an admin and use ZNC's default (English) language. Both accounts are blocked and the
+  event is logged to `log_channel`; use `unblockbnc` to lift a false positive (and exempt the account so it isn't
+  blocked again). Defaults to `false`.
+  - `shared_ip_v4_prefix` / `shared_ip_v6_prefix`: prefix length treated as "the same IP" (default `32` and `64`).
+    IPv4-mapped IPv6 addresses (`::ffff:192.0.2.1`) are compared as IPv4.
+  - `shared_ip_window_hours`: `0` (default) only matches accounts attached at the same time; a non-zero value also
+    matches accounts that attached or detached from the prefix within that many hours. This history is kept in
+    memory and starts empty whenever the bot restarts.
+  - `shared_ip_exempt_users`: usernames never checked (the bot's own user is always exempt).
+  - `shared_ip_exempt_nets`: CIDRs never checked, e.g. a webchat gateway, IRCCloud, or the ZNC host itself if
+    users connect through a local web client.
 - `blockuser_registry_path`: path to the `blockuser` module's registry file (e.g.
   `/home/bnc/.znc/moddata/blockuser/.registry`), read directly from disk to list currently blocked users. Enables
   the `listblocked` command; leave empty to disable it.
@@ -102,6 +116,7 @@ distros may need adjusted paths/commands.
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range
 - Generates a temporary password for a user on request approval and sends it to them through MemoServ
 - Tracks existing BNC user accounts to avoid overwriting existing accounts
+- Optionally blocks accounts that connect from the same IPv4 address or IPv6 /64 (`block_shared_ip`)
 
 ## Installation
 1. Set up a Python 3 virtualenv

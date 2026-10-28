@@ -43,3 +43,14 @@ def test_save_data(tmp_path: Path) -> None:
 
     data1 = BNCData.load_config(data_file)
     assert data == data1
+
+
+def test_save_data_replaces_atomically(tmp_path: Path) -> None:
+    data_file = tmp_path / "data.json"
+    data = BNCData(users={"foo": "bar"})
+    data.save_config(data_file)
+    data.users["baz"] = None
+    data.save_config(data_file)
+
+    assert BNCData.load_config(data_file) == data
+    assert [p.name for p in tmp_path.iterdir()] == ["data.json"]

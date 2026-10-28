@@ -21,7 +21,11 @@ class FileBasedDataModel(BaseModel):
 
     def save_config(self, path: Path) -> None:
         text = self.model_dump_json(indent=4, by_alias=True)
-        path.write_text(text, encoding="utf-8")
+        # Write a sibling file and rename it over the old one, so a crash
+        # mid-write can't leave a truncated file behind
+        tmp = path.with_name(f"{path.name}.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
 
 
 class BotConfig(FileBasedDataModel):

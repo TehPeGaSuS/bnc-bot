@@ -26,11 +26,5 @@
     "pastebin_field": "file",
     "min_registered_days": 7,
     "max_inactive_days": 0,
-    "inactive_check_interval_hours": 24,
-    "block_shared_ip": false,
-    "shared_ip_v4_prefix": 32,
-    "shared_ip_v6_prefix": 64,
-    "shared_ip_window_hours": 0,
-    "shared_ip_exempt_users": [],
-    "shared_ip_exempt_nets": []
+    "inactive_check_interval_hours": 24
 }

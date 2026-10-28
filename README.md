@@ -44,20 +44,6 @@ sizes, etc.) will be inherited by every new account created by the bot.
   module — severing their current connections and refusing further logins, while leaving the account itself
   intact. Requires the `blockuser` module to be loaded globally. Re-enable with `unblockbnc` (or `Unblock <user>`
   via `blockuser` directly). `0` disables the check.
-- `block_shared_ip`: if `true`, the bot blocks (via `blockuser`) every BNC account that attaches from the same IP
-  prefix as a different account. Client IPs come from ZNC's `notify_connect` global module, which must be loaded
-  (`/msg *status LoadMod --type=global notify_connect`) and broadcasts attaches/detaches to admin users; the bot's
-  ZNC user must therefore be an admin and use ZNC's default (English) language. Both accounts are blocked and the
-  event is logged to `log_channel`; use `unblockbnc` to lift a false positive (and exempt the account so it isn't
-  blocked again). Defaults to `false`.
-  - `shared_ip_v4_prefix` / `shared_ip_v6_prefix`: prefix length treated as "the same IP" (default `32` and `64`).
-    IPv4-mapped IPv6 addresses (`::ffff:192.0.2.1`) are compared as IPv4.
-  - `shared_ip_window_hours`: `0` (default) only matches accounts attached at the same time; a non-zero value also
-    matches accounts that attached or detached from the prefix within that many hours. This history is kept in
-    memory and starts empty whenever the bot restarts.
-  - `shared_ip_exempt_users`: usernames never checked (the bot's own user is always exempt).
-  - `shared_ip_exempt_nets`: CIDRs never checked, e.g. a webchat gateway, IRCCloud, or the ZNC host itself if
-    users connect through a local web client.
 - `blockuser_registry_path`: path to the `blockuser` module's registry file (e.g.
   `/home/bnc/.znc/moddata/blockuser/.registry`), read directly from disk to list currently blocked users. Enables
   the `listblocked` command; leave empty to disable it.
@@ -112,11 +98,38 @@ distros may need adjusted paths/commands.
    "bind_host_net": "2001:db8:0:0::/96",
    ```
 
+## ipguard ZNC module
+`znc/ipguard.cpp` is a global ZNC module that blocks accounts sharing an IP. On every login it compares the client's
+IP with the IPs of every other account: the ones connected right now, and each account's previous IPs seen within
+the last `window` hours. If a different account matches on the same IPv4 address or IPv6 /64, both accounts are
+blocked: their clients and IRC networks are disconnected and further logins are refused until an admin unblocks
+them (`ipunblock`). Admin users (including the bot) are never checked. Manual blocks are left to `blockuser`
+(`blockbnc`/`unblockbnc`); `ipguard` keeps its own block list.
+
+Build it like any other ZNC module, either by copying it into ZNC's `modules/` directory before running `make`, or
+with `znc-buildmod znc/ipguard.cpp` (then copy `ipguard.so` to `~/.znc/modules/`). Load it globally:
+
+```
+/msg *status LoadMod --type=global ipguard
+```
+
+It is configured through `/msg *ipguard <command>` (admins only); `Help` lists everything:
+
+- `Set window <hours>`: how long an account's previous IPs still count (default `24`; `0` only compares accounts
+  connected at the same time). Don't make this very long: ISPs reassign IPv4 addresses and CGNAT puts many
+  customers behind one, so unrelated users can end up on each other's old addresses.
+- `Set history <days>`: how long IP history is kept for `Show`/`Shared` (default `30`).
+- `Set v4prefix <bits>` / `Set v6prefix <bits>`: prefix length treated as one IP (default `32` / `64`). IPv4-mapped
+  IPv6 addresses (`::ffff:192.0.2.1`) count as IPv4.
+- `Exempt <user|cidr>` / `Unexempt <user|cidr>` / `Exempts`: never check an account or network, e.g. a webchat
+  gateway or IRCCloud's ranges.
+- `Show <user>`, `Shared <user>`, `List`, `Unblock <user>`: what the bot's `ip*` commands relay to.
+
 ## Features
 - Assigns each user a unique bindhost in the 127.0.0.0/16 range
 - Generates a temporary password for a user on request approval and sends it to them through MemoServ
 - Tracks existing BNC user accounts to avoid overwriting existing accounts
-- Optionally blocks accounts that connect from the same IPv4 address or IPv6 /64 (`block_shared_ip`)
+- Blocks accounts that connect from the same IP via the bundled `ipguard` ZNC module
 
 ## Installation
 1. Set up a Python 3 virtualenv
@@ -169,6 +182,22 @@ Unblock [username] via the `blockuser` module
 #### `listblocked`
 List BNC users blocked via the `blockuser` module (requires `blockuser_registry_path` to be configured). Replies
 inline for 2 or fewer users, otherwise uploads to a pastebin like `listusers`.
+
+#### `ipunblock <username>`
+Unblock a user blocked by the `ipguard` ZNC module for a shared IP. The networks that were connecting when the user
+was blocked are reconnected.
+
+#### `ipblocked`
+List users blocked by `ipguard`, with when and why.
+
+#### `ipshow <username>` (alias `bncip`)
+Show a user's currently connected IPs and their recent IP history from `ipguard`.
+
+#### `ipshared <username>`
+List every account that has shared an IP prefix with a user (within `ipguard`'s history, ignoring exemptions).
+
+The `ip*` commands' output comes back from `*ipguard` and is posted to `log_channel`, along with every block
+`ipguard` makes.
 
 ## Credits
 This project is forked from [TotallyNotRobots/bnc-bot](https://github.com/TotallyNotRobots/bnc-bot).

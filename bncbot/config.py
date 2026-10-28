@@ -46,12 +46,6 @@ class BotConfig(FileBasedDataModel):
     min_registered_days: int = 0
     max_inactive_days: int = 0
     inactive_check_interval_hours: int = 24
-    block_shared_ip: bool = False
-    shared_ip_v4_prefix: int = 32
-    shared_ip_v6_prefix: int = 64
-    shared_ip_window_hours: int | float = 0
-    shared_ip_exempt_users: list[str] = []
-    shared_ip_exempt_nets: list[str] = []
 
     debug: bool = False
     log_to_file: bool = False

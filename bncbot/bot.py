@@ -11,7 +11,7 @@ from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict, TypeVar
 
-from bncbot import shared_ip, util
+from bncbot import util
 from bncbot.config import BNCQueue, BNCUsers
 from bncbot.event import CommandEvent, RawEvent
 from bncbot.util import chunk_str, sanitize_username
@@ -125,19 +125,10 @@ async def on_whois_acct(conn: "Conn", irc_paramlist: list[str]) -> None:
 
 @raw("NOTICE")
 async def on_notice(
-    irc_paramlist: list[str], conn: "Conn", nick: str | None, host: str | None
+    irc_paramlist: list[str], conn: "Conn", nick: str | None
 ) -> None:
-    """Handle NickServ info responses and notify_connect broadcasts"""
+    """Handle NickServ info responses"""
     message = irc_paramlist[-1]
-    if (
-        nick
-        and host == "znc.in"
-        and nick == f"{conn.prefix}status"
-        and (client_event := shared_ip.parse_notify_connect(message))
-    ):
-        conn.handle_client_event(client_event)
-        return
-
     if nick and nick.lower() == "nickserv" and ":" in message:
         conn.logger.debug("Got nickserv message: %s", message)
         # Registered: May 30 00:53:54 2017 UTC (5 days, 19 minutes ago)
@@ -197,6 +188,9 @@ async def on_privmsg(
             _, _, val = message.partition("=")
             bncadmin_fut.set_result(val.strip() == "true")
             del conn.futures["bncadmin"]
+        elif znc_module == "ipguard":
+            # Block announcements and replies to the ip* commands
+            conn.chan_log(f"[ipguard] {message}")
     elif message[0] in conn.cmd_prefix:
         cmd, _, text = message[1:].partition(" ")
         text = text.strip()
@@ -381,6 +375,37 @@ async def cmd_listblocked(conn: "Conn", event: "CommandEvent") -> None:
         return
 
     event.message(f"Blocked user list ({len(lines)} users): {url}")
+
+
+@command("ipunblock", admin=True)
+async def cmd_ipunblock(text: str, conn: "Conn", event: "CommandEvent") -> None:
+    """<user> - Unblock [user] blocked by ipguard for a shared IP"""
+    acct = text.split()[0]
+    conn.module_msg("ipguard", f"Unblock {acct}")
+    event.message(f"ipguard unblock requested for {acct}")
+
+
+@command("ipblocked", admin=True, require_param=False)
+async def cmd_ipblocked(conn: "Conn", event: "CommandEvent") -> None:
+    """- List users blocked by ipguard (replies in the log channel)"""
+    conn.module_msg("ipguard", "List")
+    event.message("ipguard block list requested")
+
+
+@command("ipshow", "bncip", admin=True)
+async def cmd_ipshow(text: str, conn: "Conn", event: "CommandEvent") -> None:
+    """<user> - Show [user]'s current and recent IPs via ipguard"""
+    acct = text.split()[0]
+    conn.module_msg("ipguard", f"Show {acct}")
+    event.message(f"ipguard IP info requested for {acct}")
+
+
+@command("ipshared", admin=True)
+async def cmd_ipshared(text: str, conn: "Conn", event: "CommandEvent") -> None:
+    """<user> - List accounts that shared an IP prefix with [user]"""
+    acct = text.split()[0]
+    conn.module_msg("ipguard", f"Shared {acct}")
+    event.message(f"ipguard shared-IP list requested for {acct}")
 
 
 @command("delbnc", admin=True)

@@ -245,5 +245,6 @@ in-place = true
 [tool.pytest.ini_options]
 filterwarnings = ["error"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 minversion = "8.0"
 addopts = ["--doctest-modules"]

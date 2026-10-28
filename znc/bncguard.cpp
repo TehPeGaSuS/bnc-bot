@@ -3,18 +3,27 @@
  *
  * SPDX-License-Identifier: MIT
  *
- * ipguard - block ZNC accounts that connect from the same IP prefix.
+ * bncguard - account protection for a BNC service, in one global module.
  *
- * On every login the client's IP is compared with the IPs of every other
- * account: the ones connected right now, and each account's previous IPs seen
- * within the last "window" hours (24 by default). When a different account
- * matches on the same IPv4 address / IPv6 prefix (/32 and /64 by default),
- * both accounts are blocked: their clients are disconnected, their networks
- * are disconnected from IRC, and further logins are refused until an admin
- * runs "Unblock", which also reconnects the networks that were connecting.
- * Admin users, exempt users and exempt CIDRs are never checked. Every block
- * is announced to all admin users from *ipguard. Manual blocks are left to
- * the blockuser module.
+ * Shared IPs: on every login the client's IP is compared with the IPs of
+ * every other account: the ones connected right now, and each account's
+ * previous IPs seen within the last "window" hours (24 by default). When a
+ * different account matches on the same IPv4 address / IPv6 prefix (/32 and
+ * /64 by default), both accounts are blocked.
+ *
+ * Inactivity: the module records each account's last login/logout itself
+ * (importing the lastseen module's times on first use). With "inactivedays"
+ * set, an hourly check blocks accounts not seen for that many days. Accounts
+ * with a client connected right now are active, whatever their last login.
+ *
+ * Blocks (shared IP, inactivity or manual "Block") disconnect the account's
+ * clients and IRC networks and refuse further logins until "Unblock", which
+ * also reconnects the networks that were connecting. The blockuser module's
+ * list is imported on first use, so it can be unloaded afterwards.
+ *
+ * Admin users, exempt users and (for shared IPs) exempt CIDRs are never
+ * checked. Automatic blocks are announced to all admin users from
+ * *bncguard.
  */
 
 #include <znc/IRCNetwork.h>
@@ -38,8 +47,10 @@ namespace {
 
 const char* const BLOCK_PREFIX = "block:";
 const char* const SEEN_PREFIX = "seen:";
+const char* const LASTSEEN_PREFIX = "lastseen:";
 const char* const EXEMPT_PREFIX = "exempt:";
 const char* const SET_PREFIX = "set:";
+const char* const IMPORTED_KEY = "imported";
 
 // Most recent distinct IPs remembered per account
 const size_t MAX_SEEN = 10;
@@ -107,23 +118,29 @@ CString FormatTime(time_t t) {
 
 }  // namespace
 
-class CIPGuardMod : public CModule {
+class CBNCGuardMod : public CModule {
   public:
-    MODCONSTRUCTOR(CIPGuardMod) {
+    MODCONSTRUCTOR(CBNCGuardMod) {
         AddHelpCommand();
         AddCommand("Show", t_d("<user>"),
-                   t_d("Show a user's current and recent IPs"),
+                   t_d("Show a user's block status, last seen time and IPs"),
                    [=](const CString& sLine) { OnShowCommand(sLine); });
+        AddCommand("Users", "",
+                   t_d("List every user's bindhost, last seen time and "
+                       "block status"),
+                   [=](const CString& sLine) { OnUsersCommand(sLine); });
         AddCommand("Shared", t_d("<user>"),
                    t_d("List accounts that shared an IP prefix with a user"),
                    [=](const CString& sLine) { OnSharedCommand(sLine); });
         AddCommand("List", "", t_d("List blocked users"),
                    [=](const CString& sLine) { OnListCommand(sLine); });
+        AddCommand("Block", t_d("<user> [reason]"), t_d("Block a user"),
+                   [=](const CString& sLine) { OnBlockCommand(sLine); });
         AddCommand("Unblock", t_d("<user>"),
-                   t_d("Unblock a user blocked for a shared IP"),
+                   t_d("Unblock a user and reconnect their networks"),
                    [=](const CString& sLine) { OnUnblockCommand(sLine); });
         AddCommand("Exempt", t_d("<user|cidr>"),
-                   t_d("Never check a user or network"),
+                   t_d("Never check a user (IP and inactivity) or network"),
                    [=](const CString& sLine) { OnExemptCommand(sLine); });
         AddCommand("Unexempt", t_d("<user|cidr>"), t_d("Remove an exemption"),
                    [=](const CString& sLine) { OnUnexemptCommand(sLine); });
@@ -134,6 +151,30 @@ class CIPGuardMod : public CModule {
                    [=](const CString& sLine) { OnSetCommand(sLine); });
         AddCommand("Settings", "", t_d("Show settings"),
                    [=](const CString& sLine) { OnSettingsCommand(sLine); });
+        AddCommand("Import", "",
+                   t_d("Import last seen times from lastseen and blocks from "
+                       "blockuser again"),
+                   [=](const CString& sLine) {
+                       DelNV(IMPORTED_KEY);
+                       Import();
+                       if (GetNV(IMPORTED_KEY).empty()) {
+                           PutModule(t_s("Neither lastseen nor blockuser is "
+                                         "loaded"));
+                       }
+                   });
+    }
+
+    bool OnLoad(const CString& sArgs, CString& sMessage) override {
+        AddTimer(new CInactivityTimer(this));
+        // Loaded at runtime: the other modules are already there. At ZNC
+        // startup they may load after us, so OnBoot tries again.
+        Import();
+        return true;
+    }
+
+    bool OnBoot() override {
+        Import();
+        return true;
     }
 
     EModRet OnLoginAttempt(std::shared_ptr<CAuthBase> Auth) override {
@@ -148,29 +189,35 @@ class CIPGuardMod : public CModule {
     void OnClientLogin() override {
         CUser* pUser = GetUser();
         CString sIP = GetClient()->GetRemoteIP();
+        time_t now = time(nullptr);
+        SetLastSeen(pUser->GetUsername(), now);
+
         Address addr;
         if (!ParseIP(sIP, addr)) return;
 
-        time_t now = time(nullptr);
         if (!IsExemptUser(pUser) && !IsExemptIP(addr)) {
-            Check(pUser, sIP, addr, now);
+            CheckShared(pUser, sIP, addr, now);
         }
 
         RecordSeen(pUser->GetUsername(), sIP, now);
     }
 
     void OnClientDisconnect() override {
-        // Refresh the last-seen time so the window counts from the
+        // Refresh the times so the window and inactivity count from the
         // disconnect rather than the login
         if (GetUser() && GetClient()) {
+            time_t now = time(nullptr);
+            SetLastSeen(GetUser()->GetUsername(), now);
             RecordSeen(GetUser()->GetUsername(), GetClient()->GetRemoteIP(),
-                       time(nullptr));
+                       now);
         }
     }
 
     EModRet OnDeleteUser(CUser& User) override {
         DelNV(BLOCK_PREFIX + User.GetUsername());
         DelNV(SEEN_PREFIX + User.GetUsername());
+        DelNV(LASTSEEN_PREFIX + User.GetUsername());
+        DelNV(EXEMPT_PREFIX + User.GetUsername());
         return CONTINUE;
     }
 
@@ -182,7 +229,43 @@ class CIPGuardMod : public CModule {
         }
     }
 
+    void CheckInactive() {
+        unsigned int uDays = GetSetting("inactivedays").ToUInt();
+        if (!uDays) return;
+
+        time_t now = time(nullptr);
+        for (const auto& it : CZNC::Get().GetUserMap()) {
+            CUser* pUser = it.second;
+            const CString& sUser = pUser->GetUsername();
+            time_t tLast = GetLastSeen(sUser);
+            // Never seen (no record) isn't the same as inactive
+            if (!tLast || IsExemptUser(pUser) || IsBlocked(sUser) ||
+                !pUser->GetAllClients().empty()) {
+                continue;
+            }
+
+            time_t tDays = (now - tLast) / 86400;
+            if (tDays < (time_t)uDays) continue;
+
+            CString sReason = "inactive " + CString((long long)tDays) + " days";
+            Block(sUser, sReason);
+            NotifyAdmins(t_f("Blocked {1}: {2}")(sUser, sReason));
+        }
+    }
+
   private:
+    class CInactivityTimer : public CTimer {
+      public:
+        explicit CInactivityTimer(CBNCGuardMod* pModule)
+            : CTimer(pModule, 3600, 0, "inactivity",
+                     "Block accounts inactive for inactivedays days") {}
+
+      protected:
+        void RunJob() override {
+            static_cast<CBNCGuardMod*>(GetModule())->CheckInactive();
+        }
+    };
+
     struct Seen {
         CString sIP;
         time_t tTime;
@@ -195,6 +278,56 @@ class CIPGuardMod : public CModule {
         bool bLive;
     };
 
+    // Copy what the lastseen and blockuser modules know, once (until the
+    // Import command asks again). Tried on every load/boot until at least
+    // one of them was found loaded.
+    void Import() {
+        if (!GetNV(IMPORTED_KEY).empty()) return;
+
+        CModules& Mods = CZNC::Get().GetModules();
+        CModule* pLastSeen = Mods.FindModule("lastseen");
+        CModule* pBlockUser = Mods.FindModule("blockuser");
+        if (!pLastSeen && !pBlockUser) return;
+
+        unsigned int uSeen = 0, uBlocked = 0;
+        if (pLastSeen) {
+            for (const auto& it : CZNC::Get().GetUserMap()) {
+                const CString& sUser = it.first;
+                time_t tTime = (time_t)pLastSeen->GetNV(sUser).ToLongLong();
+                if (tTime > 0 && GetLastSeen(sUser) < tTime) {
+                    SetLastSeen(sUser, tTime);
+                    uSeen++;
+                }
+            }
+        }
+
+        if (pBlockUser) {
+            for (auto it = pBlockUser->BeginNV(); it != pBlockUser->EndNV();
+                 ++it) {
+                if (CZNC::Get().FindUser(it->first) &&
+                    !IsBlocked(it->first)) {
+                    // blockuser already disconnected their networks
+                    SetNV(BLOCK_PREFIX + it->first,
+                          CString((long long)time(nullptr)) +
+                              " - imported from blockuser");
+                    uBlocked++;
+                }
+            }
+        }
+
+        SetNV(IMPORTED_KEY, CString((long long)time(nullptr)));
+        NotifyAdmins(t_f("Imported {1} last seen times from lastseen and {2} "
+                         "blocked users from blockuser")(uSeen, uBlocked));
+    }
+
+    time_t GetLastSeen(const CString& sUser) {
+        return (time_t)GetNV(LASTSEEN_PREFIX + sUser).ToLongLong();
+    }
+
+    void SetLastSeen(const CString& sUser, time_t tTime) {
+        SetNV(LASTSEEN_PREFIX + sUser, CString((long long)tTime));
+    }
+
     unsigned int PrefixBits(const Address& addr) {
         return addr.family == AF_INET ? GetSetting("v4prefix").ToUInt()
                                       : GetSetting("v6prefix").ToUInt();
@@ -206,8 +339,8 @@ class CIPGuardMod : public CModule {
         return FormatAddress(addr) + "/" + CString(uBits);
     }
 
-    void Check(CUser* pUser, const CString& sIP, const Address& addr,
-               time_t now) {
+    void CheckShared(CUser* pUser, const CString& sIP, const Address& addr,
+                     time_t now) {
         vector<Match> vMatches = FindShared(pUser->GetUsername(), addr,
                                             GetSetting("window").ToUInt() *
                                                 3600, now);
@@ -273,9 +406,10 @@ class CIPGuardMod : public CModule {
         return vMatches;
     }
 
+    // Stored as "<time> <networks to restore, comma separated or -> <reason>"
     void Block(const CString& sUser, const CString& sReason) {
         CUser* pUser = CZNC::Get().FindUser(sUser);
-        if (!pUser) return;
+        if (!pUser || IsBlocked(pUser->GetUsername())) return;
 
         for (CClient* pClient : pUser->GetAllClients()) {
             pClient->PutStatusNotice(MESSAGE);
@@ -292,17 +426,23 @@ class CIPGuardMod : public CModule {
             }
         }
 
-        if (!IsBlocked(pUser->GetUsername())) {
-            SetNV(BLOCK_PREFIX + pUser->GetUsername(),
-                  CString(time(nullptr)) + " " +
-                      CString(",").Join(vsNetworks.begin(),
-                                        vsNetworks.end()) +
-                      " " + sReason);
-        }
+        CString sNetworks =
+            CString(",").Join(vsNetworks.begin(), vsNetworks.end());
+        SetNV(BLOCK_PREFIX + pUser->GetUsername(),
+              CString((long long)time(nullptr)) + " " +
+                  (sNetworks.empty() ? "-" : sNetworks) + " " + sReason);
     }
 
     bool IsBlocked(const CString& sUser) {
         return FindNV(BLOCK_PREFIX + sUser) != EndNV();
+    }
+
+    CString BlockSince(const CString& sValue) {
+        return FormatTime((time_t)sValue.Token(0).ToLongLong());
+    }
+
+    CString BlockReason(const CString& sValue) {
+        return sValue.Token(2, true);
     }
 
     bool IsExemptUser(CUser* pUser) {
@@ -368,6 +508,12 @@ class CIPGuardMod : public CModule {
         }
     }
 
+    CString LastSeenText(CUser* pUser) {
+        if (!pUser->GetAllClients().empty()) return t_s("connected now");
+        time_t tLast = GetLastSeen(pUser->GetUsername());
+        return tLast ? FormatTime(tLast) : t_s("never");
+    }
+
     // name -> (default, description)
     static const std::map<CString, std::pair<CString, CString>>& Settings() {
         static const std::map<CString, std::pair<CString, CString>> settings =
@@ -379,6 +525,9 @@ class CIPGuardMod : public CModule {
                  {"30", "Days of IP history kept per account (Show/Shared)"}},
                 {"v4prefix", {"32", "IPv4 prefix length treated as one IP"}},
                 {"v6prefix", {"64", "IPv6 prefix length treated as one IP"}},
+                {"inactivedays",
+                 {"0", "Block accounts not seen for this many days, checked "
+                       "hourly (0 = off)"}},
             };
         return settings;
     }
@@ -405,13 +554,14 @@ class CIPGuardMod : public CModule {
         CUser* pUser = FindUserOrComplain(sUser);
         if (!pUser) return;
 
-        auto it = FindNV(BLOCK_PREFIX + pUser->GetUsername());
+        const CString& sName = pUser->GetUsername();
+        auto it = FindNV(BLOCK_PREFIX + sName);
         if (it != EndNV()) {
             PutModule(t_f("{1} is blocked since {2}: {3}")(
-                pUser->GetUsername(),
-                FormatTime((time_t)it->second.Token(0).ToLongLong()),
-                it->second.Token(2, true)));
+                sName, BlockSince(it->second), BlockReason(it->second)));
         }
+
+        PutModule(t_f("{1} last seen: {2}")(sName, LastSeenText(pUser)));
 
         CTable Table;
         Table.AddColumn(t_s("IP"));
@@ -427,7 +577,7 @@ class CIPGuardMod : public CModule {
             Table.SetCell(t_s("Last seen"), t_s("connected"));
         }
 
-        for (const Seen& seen : GetSeen(pUser->GetUsername())) {
+        for (const Seen& seen : GetSeen(sName)) {
             Address addr;
             Table.AddRow();
             Table.SetCell(t_s("IP"), seen.sIP);
@@ -437,11 +587,28 @@ class CIPGuardMod : public CModule {
             Table.SetCell(t_s("Last seen"), FormatTime(seen.tTime));
         }
 
-        if (Table.empty()) {
-            PutModule(t_f("No IPs known for {1}")(pUser->GetUsername()));
-        } else {
-            PutModule(Table);
+        if (!Table.empty()) PutModule(Table);
+    }
+
+    void OnUsersCommand(const CString& sLine) {
+        CTable Table;
+        Table.AddColumn(t_s("User"));
+        Table.AddColumn(t_s("Bindhost"));
+        Table.AddColumn(t_s("Last seen"));
+        Table.AddColumn(t_s("Blocked"));
+        for (const auto& it : CZNC::Get().GetUserMap()) {
+            CUser* pUser = it.second;
+            Table.AddRow();
+            Table.SetCell(t_s("User"), pUser->GetUsername());
+            Table.SetCell(t_s("Bindhost"), pUser->GetBindHost());
+            Table.SetCell(t_s("Last seen"), LastSeenText(pUser));
+            auto block = FindNV(BLOCK_PREFIX + pUser->GetUsername());
+            if (block != EndNV()) {
+                Table.SetCell(t_s("Blocked"), BlockReason(block->second));
+            }
         }
+
+        PutModule(Table);
     }
 
     void OnSharedCommand(const CString& sLine) {
@@ -501,9 +668,8 @@ class CIPGuardMod : public CModule {
             Table.AddRow();
             Table.SetCell(t_s("User"),
                           it->first.substr(strlen(BLOCK_PREFIX)));
-            Table.SetCell(t_s("Since"),
-                          FormatTime((time_t)it->second.Token(0).ToLongLong()));
-            Table.SetCell(t_s("Reason"), it->second.Token(2, true));
+            Table.SetCell(t_s("Since"), BlockSince(it->second));
+            Table.SetCell(t_s("Reason"), BlockReason(it->second));
         }
 
         if (Table.empty()) {
@@ -511,6 +677,33 @@ class CIPGuardMod : public CModule {
         } else {
             PutModule(Table);
         }
+    }
+
+    void OnBlockCommand(const CString& sLine) {
+        CString sUser = sLine.Token(1);
+        CString sReason = sLine.Token(2, true);
+        if (sUser.empty()) {
+            PutModule(t_s("Usage: Block <user> [reason]"));
+            return;
+        }
+
+        CUser* pUser = FindUserOrComplain(sUser);
+        if (!pUser) return;
+
+        if (pUser == GetUser()) {
+            PutModule(t_s("You can't block yourself"));
+            return;
+        }
+
+        if (IsBlocked(pUser->GetUsername())) {
+            PutModule(t_f("{1} is already blocked")(pUser->GetUsername()));
+            return;
+        }
+
+        Block(pUser->GetUsername(),
+              "manual (" + GetUser()->GetUsername() + ")" +
+                  (sReason.empty() ? "" : ": " + sReason));
+        PutModule(t_f("Blocked {1}")(pUser->GetUsername()));
     }
 
     void OnUnblockCommand(const CString& sLine) {
@@ -536,6 +729,9 @@ class CIPGuardMod : public CModule {
                 CIRCNetwork* pNetwork = pUser->FindNetwork(sNetwork);
                 if (pNetwork) pNetwork->SetIRCConnectEnabled(true);
             }
+
+            // Don't block them again for inactivity before they can log in
+            SetLastSeen(pUser->GetUsername(), time(nullptr));
         }
 
         PutModule(t_f("Unblocked {1}")(sUser));
@@ -612,6 +808,7 @@ class CIPGuardMod : public CModule {
 
         SetNV(SET_PREFIX + sName, CString(uValue));
         PutModule(t_f("{1} = {2}")(sName, CString(uValue)));
+        if (sName == "inactivedays") CheckInactive();
     }
 
     void OnSettingsCommand(const CString& sLine) {
@@ -631,9 +828,10 @@ class CIPGuardMod : public CModule {
 };
 
 template <>
-void TModInfo<CIPGuardMod>(CModInfo& Info) {
+void TModInfo<CBNCGuardMod>(CModInfo& Info) {
     Info.SetHasArgs(false);
 }
 
-GLOBALMODULEDEFS(CIPGuardMod,
-                 t_s("Block accounts that connect from the same IP prefix."))
+GLOBALMODULEDEFS(CBNCGuardMod,
+                 t_s("Shared IP, inactivity and manual blocks for a BNC "
+                     "service."))

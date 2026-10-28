@@ -13,7 +13,6 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
-from pathlib import Path
 from typing import TypeAlias
 
 REGISTERED_DATE_RE = re.compile(r"^(.*?\d{4})\s+UTC\b")
@@ -108,44 +107,8 @@ def registered_age_days(nickserv_info: str) -> int | None:
     return (datetime.now(timezone.utc) - registered).days
 
 
-def znc_registry_decode(value: str) -> str:
-    """Decode a ZNC MCString registry token (%XX; escapes)"""
-    out = []
-    i = 0
-    n = len(value)
-    while i < n:
-        c = value[i]
-        if c == "%" and i + 3 < n and value[i + 3] == ";":
-            try:
-                out.append(chr(int(value[i + 1 : i + 3], 16)))
-                i += 4
-                continue
-            except ValueError:
-                pass
-
-        out.append(c)
-        i += 1
-
-    return "".join(out)
-
-
-def parse_znc_registry(path: Path) -> dict[str, str]:
-    """Parse a ZNC module's .registry file into a {key: value} dict"""
-    result: dict[str, str] = {}
-    if not path.exists():
-        return result
-
-    for raw_line in path.read_text(
-        encoding="utf-8", errors="replace"
-    ).splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        key, _, value = line.partition(" ")
-        result[znc_registry_decode(key)] = znc_registry_decode(value)
-
-    return result
+class ZNCModuleError(Exception):
+    """A ZNC module couldn't be queried or gave an unexpected reply"""
 
 
 def upload_pastebin(

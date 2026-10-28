@@ -8,6 +8,7 @@ import inspect
 import ipaddress
 import logging
 import logging.config
+import secrets
 import signal
 from collections import defaultdict
 from collections.abc import Callable
@@ -52,10 +53,8 @@ class Conn:
         self.stopped_future = asyncio.Future[None]()
         self.get_users_state: int = 0
         self.config = BotConfig.load_config(self.config_file)
-        self._lastseen_cache: dict[str, str] = {}
-        self._lastseen_mtime: float | None = None
-        self._blocked_cache: set[str] = set()
-        self._blocked_mtime: float | None = None
+        # ZNC module name -> reply lines being collected by query_module()
+        self.module_replies: dict[str, list[str]] = {}
         if not self.log_dir.exists():
             self.log_dir.mkdir()
 
@@ -169,11 +168,6 @@ class Conn:
             self.get_user_hosts,
             initial_interval=timedelta(hours=8),
         )
-        if self.config.max_inactive_days:
-            self.create_timer(
-                timedelta(hours=self.config.inactive_check_interval_hours),
-                self.check_inactive_users,
-            )
 
     def send(self, *parts: str) -> None:
         if not self._protocol:
@@ -281,108 +275,30 @@ class Conn:
     def is_admin(self, mask: str) -> bool:
         return any(fnmatch(mask.lower(), pat.lower()) for pat in self.admins)
 
-    def _refresh_lastseen(self) -> None:
-        path = Path(self.config.lastseen_registry_path)
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            self._lastseen_cache = {}
-            self._lastseen_mtime = None
-            return
-
-        if mtime != self._lastseen_mtime:
-            self._lastseen_cache = util.parse_znc_registry(path)
-            self._lastseen_mtime = mtime
-
-    def get_lastseen(self, username: str) -> str | None:
-        """Look up a user's last-seen time from the ZNC lastseen module's
-        registry file. Returns None if the user has no recorded entry.
-        Raises ValueError if lastseen_registry_path isn't configured."""
-        if not self.config.lastseen_registry_path:
-            raise ValueError
-
-        self._refresh_lastseen()
-        raw = self._lastseen_cache.get(username)
-        if raw is None:
-            return None
-
-        try:
-            timestamp = int(raw)
-        except ValueError:
-            return None
-
-        # naive/local to match ZNC's own strftime("%c", localtime(...)) display
-        return datetime.fromtimestamp(timestamp).strftime("%c")  # noqa: DTZ006
-
-    def get_lastseen_days(self, username: str) -> int | None:
-        """Days since a user was last seen connected, or None if there's no
-        recorded entry. Raises ValueError if lastseen_registry_path isn't
-        configured."""
-        if not self.config.lastseen_registry_path:
-            raise ValueError
-
-        self._refresh_lastseen()
-        raw = self._lastseen_cache.get(username)
-        if raw is None:
-            return None
-
-        try:
-            timestamp = int(raw)
-        except ValueError:
-            return None
-
-        seen = datetime.fromtimestamp(timestamp)  # noqa: DTZ006
-        return (datetime.now() - seen).days  # noqa: DTZ005
-
-    async def check_inactive_users(self) -> None:
-        """Block any BNC user inactive for longer than max_inactive_days via
-        the blockuser module, severing their existing connections and
-        refusing further logins while keeping the account intact."""
-        max_days = self.config.max_inactive_days
-        if not max_days or not self.config.lastseen_registry_path:
-            return
-
-        try:
-            blocked = self.get_blocked_users()
-        except ValueError:
-            blocked = set()
-
-        for user in list(self.bnc_users):
-            if user in blocked:
-                continue
-
+    async def query_module(
+        self, module: str, cmd: str, timeout: float = 30
+    ) -> list[str]:
+        """Send cmd to a ZNC module and return its reply lines. ZNC handles a
+        client's lines in order, so a PING sent right after the command is
+        answered only once the module's (synchronous) reply has been sent,
+        marking its end. Raises util.ZNCModuleError on timeout."""
+        async with self.locks[f"module_{module}"]:
+            token = f"bncbot-{secrets.token_hex(4)}"
+            pong: asyncio.Future[None] = self.loop.create_future()
+            self.futures[f"pong_{token}"] = pong
+            lines = self.module_replies[module] = []
             try:
-                days = self.get_lastseen_days(user)
-            except ValueError:
-                return
+                self.module_msg(module, cmd)
+                self.send("PING", f":{token}")
+                await asyncio.wait_for(pong, timeout)
+            except asyncio.TimeoutError:
+                msg = f"Timed out waiting for {self.prefix}{module}"
+                raise util.ZNCModuleError(msg) from None
+            finally:
+                del self.module_replies[module]
+                self.futures.pop(f"pong_{token}", None)
 
-            if days is None or days < max_days:
-                continue
-
-            self.module_msg("blockuser", f"Block {user}")
-            self.chan_log(f"{user} has been blocked (inactive {days} days)")
-
-    def _refresh_blocked(self) -> None:
-        path = Path(self.config.blockuser_registry_path)
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            self._blocked_cache = set()
-            self._blocked_mtime = None
-            return
-
-        if mtime != self._blocked_mtime:
-            self._blocked_cache = set(util.parse_znc_registry(path))
-            self._blocked_mtime = mtime
-
-    def get_blocked_users(self) -> set[str]:
-        """Return the set of usernames blocked via the blockuser module.
-        Raises ValueError if blockuser_registry_path isn't configured."""
-        if not self.config.blockuser_registry_path:
-            raise ValueError
-
-        self._refresh_blocked()
-        return set(self._blocked_cache)
+            return lines
 
     async def upload_pastebin(self, content: str, filename: str) -> str:
         if not self.config.pastebin_url:

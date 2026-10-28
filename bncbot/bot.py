@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict, TypeVar
 from bncbot import util
 from bncbot.config import BNCDenied, BNCQueue, BNCUsers, Denial
 from bncbot.event import CommandEvent, RawEvent
-from bncbot.util import chunk_str, sanitize_username
+from bncbot.util import ZNCModuleError, chunk_str, sanitize_username
 
 if TYPE_CHECKING:
     from bncbot.conn import Conn
@@ -157,7 +157,9 @@ async def on_privmsg(
     message = irc_paramlist[-1]
     if nick and nick.startswith(conn.prefix) and host == "znc.in":
         znc_module = nick[len(conn.prefix) :]
-        if znc_module == "status" and (
+        if (replies := conn.module_replies.get(znc_module)) is not None:
+            replies.append(message)
+        elif znc_module == "status" and (
             user_lsit_fut := conn.futures.get("user_list")
         ):
             match = re.match(
@@ -188,9 +190,9 @@ async def on_privmsg(
             _, _, val = message.partition("=")
             bncadmin_fut.set_result(val.strip() == "true")
             del conn.futures["bncadmin"]
-        elif znc_module == "ipguard":
-            # Block announcements and replies to the ip* commands
-            conn.chan_log(f"[ipguard] {message}")
+        elif znc_module == "bncguard":
+            # Block announcements (replies to commands are collected above)
+            conn.chan_log(f"[bncguard] {message}")
     elif message[0] in conn.cmd_prefix:
         cmd, _, text = message[1:].partition(" ")
         text = text.strip()
@@ -207,6 +209,14 @@ async def on_privmsg(
             return
 
         await conn.launch_hook(cmd_event, handler.func)
+
+
+@raw("PONG")
+async def on_pong(conn: "Conn", irc_paramlist: list[str]) -> None:
+    """End marker for Conn.query_module()"""
+    fut = conn.futures.pop(f"pong_{irc_paramlist[-1]}", None)
+    if fut and not fut.done():
+        fut.set_result(None)
 
 
 @raw("NICK")
@@ -345,135 +355,108 @@ async def cmd_bncqueue(bnc_queue: BNCQueue, event: "CommandEvent") -> None:
         event.message("BNC request queue is empty")
 
 
-@command("lastseen", admin=True)
-async def cmd_lastseen(text: str, conn: "Conn", event: "CommandEvent") -> None:
-    """<user> - Show when [user] was last seen connected to the BNC"""
-    acct = text.split()[0]
-    try:
-        seen = conn.get_lastseen(acct)
-    except ValueError:
-        event.message("lastseen_registry_path is not configured")
-        return
-
-    if seen is None:
-        event.message(f"No lastseen record for {acct}")
-    else:
-        event.message(f"{acct} was last seen: {seen}")
-
-
-@command("listusers", "bncusers", admin=True, require_param=False)
-async def cmd_listusers(
-    bnc_users: BNCUsers, conn: "Conn", event: "CommandEvent"
+async def bncguard_reply(
+    conn: "Conn",
+    event: "CommandEvent",
+    cmd: str,
+    title: str,
+    filename: str,
+    *,
+    paste: bool = False,
 ) -> None:
-    """- Upload the full list of BNC users to a pastebin"""
-    if not bnc_users:
-        event.message("No BNC users")
+    """Run cmd on the bncguard ZNC module and pass its reply on unchanged:
+    inline up to max_inline_lines, otherwise (or with paste) via the
+    pastebin"""
+    try:
+        lines = await conn.query_module("bncguard", cmd)
+    except ZNCModuleError as e:
+        event.message(str(e))
         return
 
-    try:
-        blocked = conn.get_blocked_users()
-    except ValueError:
-        blocked = set()
+    if not lines:
+        event.message(
+            f"No reply from {conn.prefix}bncguard (is it loaded globally?)"
+        )
+        return
 
-    lines = [
-        "ZNC Users",
-        "---------",
-        "",
-        *(
-            f"{nick} - {host or '(no bindhost)'}"
-            f"{' (blocked)' if nick in blocked else ''}"
-            for nick, host in sorted(bnc_users.items())
-        ),
-    ]
-    content = "\n".join(lines)
+    if not paste and len(lines) <= conn.config.max_inline_lines:
+        for line in lines:
+            event.message(line)
 
+        return
+
+    content = "\n".join([title, "-" * len(title), "", *lines])
     try:
-        url = await conn.upload_pastebin(content, "bnc-users.txt")
+        url = await conn.upload_pastebin(content, filename)
     except ValueError:
         event.message("pastebin_url is not configured")
         return
 
-    event.message(f"BNC user list ({len(bnc_users)} users): {url}")
+    event.message(f"{title}: {url}")
+
+
+@command("lastseen", "bncshow", "bncip", "ipshow", admin=True)
+async def cmd_lastseen(text: str, conn: "Conn", event: "CommandEvent") -> None:
+    """<user> - Show [user]'s block status, last seen time and recent IPs"""
+    acct = text.split()[0]
+    await bncguard_reply(
+        conn, event, f"Show {acct}", f"BNC user {acct}", "bnc-user.txt"
+    )
+
+
+@command("listusers", "bncusers", admin=True, require_param=False)
+async def cmd_listusers(conn: "Conn", event: "CommandEvent") -> None:
+    """- Upload every user's bindhost, last seen time and block status"""
+    await bncguard_reply(
+        conn, event, "Users", "BNC Users", "bnc-users.txt", paste=True
+    )
 
 
 @command("blockbnc", admin=True)
 async def cmd_blockbnc(text: str, conn: "Conn", event: "CommandEvent") -> None:
-    """<user> - Block [user] via the blockuser module"""
-    acct = text.split()[0]
-    conn.module_msg("blockuser", f"Block {acct}")
-    event.message(f"Block requested for {acct}")
+    """<user> [reason] - Block [user], disconnecting them from the BNC"""
+    acct, _, reason = text.partition(" ")
+    await bncguard_reply(
+        conn,
+        event,
+        f"Block {acct} {reason.strip()}".strip(),
+        "Block",
+        "block.txt",
+    )
 
 
-@command("unblockbnc", admin=True)
+@command("unblockbnc", "ipunblock", admin=True)
 async def cmd_unblockbnc(
     text: str, conn: "Conn", event: "CommandEvent"
 ) -> None:
-    """<user> - Unblock [user] via the blockuser module"""
+    """<user> - Unblock [user] and reconnect the networks they had"""
     acct = text.split()[0]
-    conn.module_msg("blockuser", f"Unblock {acct}")
-    conn.module_msg(
-        "controlpanel", f"Reconnect {acct} {conn.config.bnc_network}"
+    await bncguard_reply(
+        conn, event, f"Unblock {acct}", "Unblock", "unblock.txt"
     )
-    event.message(f"Unblock requested for {acct}")
 
 
-@command("listblocked", "bncblocked", admin=True, require_param=False)
+@command(
+    "listblocked", "bncblocked", "ipblocked", admin=True, require_param=False
+)
 async def cmd_listblocked(conn: "Conn", event: "CommandEvent") -> None:
-    """- List BNC users blocked via the blockuser module"""
-    try:
-        blocked = conn.get_blocked_users()
-    except ValueError:
-        event.message("blockuser_registry_path is not configured")
-        return
-
-    if not blocked:
-        event.message("No blocked users")
-        return
-
-    lines = sorted(blocked)
-    if len(lines) <= conn.config.max_inline_lines:
-        event.message(f"Blocked users: {', '.join(lines)}")
-        return
-
-    content = "\n".join(["Blocked BNC Users", "-----------------", "", *lines])
-    try:
-        url = await conn.upload_pastebin(content, "blocked-users.txt")
-    except ValueError:
-        event.message("pastebin_url is not configured")
-        return
-
-    event.message(f"Blocked user list ({len(lines)} users): {url}")
+    """- List blocked BNC users with when and why they were blocked"""
+    await bncguard_reply(
+        conn, event, "List", "Blocked BNC Users", "blocked-users.txt"
+    )
 
 
-@command("ipunblock", admin=True)
-async def cmd_ipunblock(text: str, conn: "Conn", event: "CommandEvent") -> None:
-    """<user> - Unblock [user] blocked by ipguard for a shared IP"""
-    acct = text.split()[0]
-    conn.module_msg("ipguard", f"Unblock {acct}")
-    event.message(f"ipguard unblock requested for {acct}")
-
-
-@command("ipblocked", admin=True, require_param=False)
-async def cmd_ipblocked(conn: "Conn", event: "CommandEvent") -> None:
-    """- List users blocked by ipguard (replies in the log channel)"""
-    conn.module_msg("ipguard", "List")
-    event.message("ipguard block list requested")
-
-
-@command("ipshow", "bncip", admin=True)
-async def cmd_ipshow(text: str, conn: "Conn", event: "CommandEvent") -> None:
-    """<user> - Show [user]'s current and recent IPs via ipguard"""
-    acct = text.split()[0]
-    conn.module_msg("ipguard", f"Show {acct}")
-    event.message(f"ipguard IP info requested for {acct}")
-
-
-@command("ipshared", admin=True)
+@command("ipshared", "bncshared", admin=True)
 async def cmd_ipshared(text: str, conn: "Conn", event: "CommandEvent") -> None:
     """<user> - List accounts that shared an IP prefix with [user]"""
     acct = text.split()[0]
-    conn.module_msg("ipguard", f"Shared {acct}")
-    event.message(f"ipguard shared-IP list requested for {acct}")
+    await bncguard_reply(
+        conn,
+        event,
+        f"Shared {acct}",
+        f"Accounts sharing an IP with {acct}",
+        "shared-ip.txt",
+    )
 
 
 @command("delbnc", admin=True)

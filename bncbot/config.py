@@ -44,13 +44,9 @@ class BotConfig(FileBasedDataModel):
     user_channels: list[str] = []
     command_prefix: str = "."
     bind_host_net: str = "127.0.0.0/16"
-    lastseen_registry_path: str = ""
-    blockuser_registry_path: str = ""
     pastebin_url: str = "https://x0.at"
     pastebin_field: str = "file"
     min_registered_days: int = 0
-    max_inactive_days: int = 0
-    inactive_check_interval_hours: int = 24
     max_inline_lines: int = 3
 
     debug: bool = False

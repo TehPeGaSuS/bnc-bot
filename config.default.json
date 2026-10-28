@@ -20,12 +20,8 @@
     ],
     "command_prefix": ".",
     "bind_host_net": "127.0.0.0/16",
-    "lastseen_registry_path": "",
-    "blockuser_registry_path": "",
     "pastebin_url": "https://x0.at",
     "pastebin_field": "file",
     "min_registered_days": 7,
-    "max_inactive_days": 0,
-    "inactive_check_interval_hours": 24,
     "max_inline_lines": 3
 }

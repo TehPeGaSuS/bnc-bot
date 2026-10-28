@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional, overload
 
 from typing_extensions import Self
 
-from bncbot.config import BNCData, BNCQueue, BNCUsers
+from bncbot.config import BNCData, BNCDenied, BNCQueue, BNCUsers
 
 if TYPE_CHECKING:
     from irclib.parser import Message, ParamList
@@ -105,6 +105,10 @@ class Event:
     @property
     def bnc_users(self) -> BNCUsers:
         return self.conn.bnc_users
+
+    @property
+    def bnc_denied(self) -> BNCDenied:
+        return self.conn.bnc_denied
 
     @property
     def event(self) -> Self:

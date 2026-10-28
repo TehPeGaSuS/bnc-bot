@@ -12,7 +12,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict, TypeVar
 
 from bncbot import util
-from bncbot.config import BNCQueue, BNCUsers
+from bncbot.config import BNCDenied, BNCQueue, BNCUsers, Denial
 from bncbot.event import CommandEvent, RawEvent
 from bncbot.util import chunk_str, sanitize_username
 
@@ -242,18 +242,86 @@ async def cmd_acceptbnc(
 async def cmd_denybnc(
     text: str, event: "CommandEvent", bnc_queue: BNCQueue, conn: "Conn"
 ) -> None:
-    """<user> - Deny [user]'s BNC request"""
-    nick = text.split()[0]
+    """<user> [reason] - Deny [user]'s BNC request, recording [reason]"""
+    nick, _, reason = text.partition(" ")
+    reason = reason.strip()
     if nick not in bnc_queue:
         event.message(f"{nick} is not in the BNC queue.")
         return
 
     conn.rem_queue(nick)
+    conn.add_denial(nick, event.nick or "?", reason)
     event.message(
         f"SEND {nick} Your BNC auth could not be added at this time", "MemoServ"
     )
 
     conn.chan_log(f"{nick} has been denied. Memoserv sent.")
+
+
+def format_denial(account: str, denial: Denial) -> str:
+    return (
+        f"{account} - {denial.time:%Y-%m-%d %H:%M} UTC by {denial.by}: "
+        f"{denial.reason or '(no reason)'}"
+    )
+
+
+def denial_summary(denials: list[Denial]) -> str:
+    last = denials[-1]
+    return (
+        f"denied {len(denials)}x before, last {last.time:%Y-%m-%d} by "
+        f"{last.by}: {last.reason or '(no reason)'}"
+    )
+
+
+@command("deniedbnc", "bncdenied", admin=True, require_param=False)
+async def cmd_deniedbnc(
+    text: str, conn: "Conn", event: "CommandEvent", bnc_denied: BNCDenied
+) -> None:
+    """[account] - List denied BNC requests, newest first"""
+    account = text.split()[0] if text else None
+    if account:
+        if account not in bnc_denied:
+            event.message(f"{account} has no denied BNC requests")
+            return
+
+        entries = [(account, d) for d in bnc_denied[account]]
+    else:
+        entries = [(a, d) for a, ds in bnc_denied.items() for d in ds]
+
+    if not entries:
+        event.message("No denied BNC requests")
+        return
+
+    entries.sort(key=lambda entry: entry[1].time, reverse=True)
+    lines = [format_denial(a, d) for a, d in entries]
+    if len(lines) <= conn.config.max_inline_lines:
+        for line in lines:
+            event.message(line)
+
+        return
+
+    content = "\n".join(
+        ["Denied BNC Requests", "-------------------", "", *lines]
+    )
+    try:
+        url = await conn.upload_pastebin(content, "denied-bnc.txt")
+    except ValueError:
+        event.message("pastebin_url is not configured")
+        return
+
+    event.message(f"Denied BNC requests ({len(lines)}): {url}")
+
+
+@command("cleardenied", admin=True)
+async def cmd_cleardenied(
+    text: str, conn: "Conn", event: "CommandEvent"
+) -> None:
+    """<account> - Forget [account]'s denied BNC requests"""
+    account = text.split()[0]
+    if conn.clear_denials(account):
+        event.message(f"Cleared denied BNC requests for {account}")
+    else:
+        event.message(f"{account} has no denied BNC requests")
 
 
 @command("bncrefresh", admin=True, require_param=False)
@@ -363,7 +431,7 @@ async def cmd_listblocked(conn: "Conn", event: "CommandEvent") -> None:
         return
 
     lines = sorted(blocked)
-    if len(lines) <= 2:
+    if len(lines) <= conn.config.max_inline_lines:
         event.message(f"Blocked users: {', '.join(lines)}")
         return
 
@@ -556,7 +624,11 @@ async def cmd_requestbnc(
 
     conn.add_queue(acct, registered_time)
     event.message("BNC request submitted.", nick)
-    conn.chan_log(f"{acct} added to bnc queue. Registered {registered_time}")
+    msg = f"{acct} added to bnc queue. Registered {registered_time}"
+    if denials := conn.bnc_denied.get(acct):
+        msg += f" ({denial_summary(denials)})"
+
+    conn.chan_log(msg)
 
 
 @command("genbindhost", require_param=False, admin=True)

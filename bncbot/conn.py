@@ -11,7 +11,7 @@ import logging.config
 import signal
 from collections import defaultdict
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -22,7 +22,14 @@ from asyncirc.server import Server
 from bncbot import irc, util
 from bncbot.async_util import call_func, timer
 from bncbot.bot import Handlers
-from bncbot.config import BNCData, BNCQueue, BNCUsers, BotConfig
+from bncbot.config import (
+    BNCData,
+    BNCDenied,
+    BNCQueue,
+    BNCUsers,
+    BotConfig,
+    Denial,
+)
 
 if TYPE_CHECKING:
     from irclib.parser import Message
@@ -411,6 +418,20 @@ class Conn:
             del self.bnc_queue[nick]
             self.save_data()
 
+    def add_denial(self, account: str, by: str, reason: str = "") -> None:
+        self.bnc_denied.setdefault(account, []).append(
+            Denial(time=datetime.now(timezone.utc), by=by, reason=reason)
+        )
+        self.save_data()
+
+    def clear_denials(self, account: str) -> bool:
+        if account not in self.bnc_denied:
+            return False
+
+        del self.bnc_denied[account]
+        self.save_data()
+        return True
+
     def chan_log(self, msg: str) -> None:
         if self.log_chan:
             self.msg(self.log_chan, msg)
@@ -481,6 +502,10 @@ class Conn:
     @property
     def bnc_queue(self) -> BNCQueue:
         return self.bnc_data.queue
+
+    @property
+    def bnc_denied(self) -> BNCDenied:
+        return self.bnc_data.denied
 
     @property
     def bnc_users(self) -> BNCUsers:

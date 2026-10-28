@@ -47,6 +47,8 @@ sizes, etc.) will be inherited by every new account created by the bot.
 - `blockuser_registry_path`: path to the `blockuser` module's registry file (e.g.
   `/home/bnc/.znc/moddata/blockuser/.registry`), read directly from disk to list currently blocked users. Enables
   the `listblocked` command; leave empty to disable it.
+- `max_inline_lines`: longest list `listblocked` and `deniedbnc` reply with inline before uploading it to the
+  pastebin instead. Defaults to `3`.
 - `channels`: channels the bot itself joins on connect (e.g. `log_channel`, since the bot only sends messages
   there but never joins it automatically otherwise).
 - `user_channels`: channels automatically added to a new BNC user's `bnc_network` on account creation (via
@@ -148,8 +150,17 @@ Submit a BNC account request
 #### `acceptbnc <username>`
 Accept a BNC account request for [username]
 
-#### `denybnc <username>`
-Deny a BNC account request for [username]
+#### `denybnc <username> [reason]`
+Deny a BNC account request for [username]. The denial is recorded with the time, the admin and the optional reason
+(the reason is not sent to the user). If the account requests again, the log channel line notes the earlier
+denials.
+
+#### `deniedbnc [account]`
+List denied BNC requests, newest first, optionally for one account only. Replies inline for up to
+`max_inline_lines` lines, otherwise uploads the list to a pastebin like `listusers`.
+
+#### `cleardenied <account>`
+Forget an account's denied BNC requests.
 
 #### `delbnc <username>`
 Delete [username]'s BNC account
@@ -181,7 +192,7 @@ Unblock [username] via the `blockuser` module
 
 #### `listblocked`
 List BNC users blocked via the `blockuser` module (requires `blockuser_registry_path` to be configured). Replies
-inline for 2 or fewer users, otherwise uploads to a pastebin like `listusers`.
+inline for up to `max_inline_lines` users, otherwise uploads to a pastebin like `listusers`.
 
 #### `ipunblock <username>`
 Unblock a user blocked by the `ipguard` ZNC module for a shared IP. The networks that were connecting when the user

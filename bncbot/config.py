@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -46,16 +47,25 @@ class BotConfig(FileBasedDataModel):
     min_registered_days: int = 0
     max_inactive_days: int = 0
     inactive_check_interval_hours: int = 24
+    max_inline_lines: int = 3
 
     debug: bool = False
     log_to_file: bool = False
     nickserv_timeout: int | float = 30
 
 
+class Denial(BaseModel):
+    time: datetime
+    by: str
+    reason: str = ""
+
+
 BNCUsers = dict[str, str | None]
 BNCQueue = dict[str, str]
+BNCDenied = dict[str, list[Denial]]
 
 
 class BNCData(FileBasedDataModel):
     queue: BNCQueue = {}
     users: BNCUsers = {}
+    denied: BNCDenied = {}

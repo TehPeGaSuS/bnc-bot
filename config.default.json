@@ -26,5 +26,6 @@
     "pastebin_field": "file",
     "min_registered_days": 7,
     "max_inactive_days": 0,
-    "inactive_check_interval_hours": 24
+    "inactive_check_interval_hours": 24,
+    "max_inline_lines": 3
 }

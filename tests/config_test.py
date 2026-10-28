@@ -35,7 +35,8 @@ def test_save_data(tmp_path: Path) -> None:
     \"queue\": {},
     \"users\": {
         \"foo\": \"bar\"
-    }
+    },
+    \"denied\": {}
 }"""
 
     assert data_file.read_text(encoding="utf-8") == expected

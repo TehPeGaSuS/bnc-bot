@@ -55,3 +55,20 @@ def test_add_user_reconnects_to_configured_network(tmp_path: Path) -> None:
         "PRIVMSG *controlpanel :reconnect somenick MyNetwork"
     ]
     assert conn.bnc_users["somenick"] is not None
+
+
+def test_add_user_logs_bindhost(tmp_path: Path) -> None:
+    conn = _make_conn(
+        BotConfig(log_channel="##log", bind_host_net="2001:db8::/96"),
+        run_dir=tmp_path,
+    )
+
+    with mock.patch.object(conn, "send") as mock_send:
+        assert conn.add_user("somenick") is True
+
+    host = conn.bnc_users["somenick"]
+    assert host
+    assert host.startswith("2001:db8::")
+    mock_send.assert_any_call(
+        f"PRIVMSG ##log :somenick was assigned bindhost {host}"
+    )

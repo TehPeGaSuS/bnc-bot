@@ -392,6 +392,9 @@ class Conn:
         )
         self.bnc_users[username] = host
         self.save_data()
+        # Needed when the bindhost subnet isn't routed to the machine and
+        # each address has to be added to the interface by hand
+        self.chan_log(f"{username} was assigned bindhost {host}")
         return True
 
     def get_bind_host(self) -> str:
